@@ -27,7 +27,7 @@ func _ready() -> void:
 	light.texture = Art.light_texture()
 	light.texture_scale = 1.6
 	light.position = Vector2(0, -20)
-	light.color = Color(1.0, 0.85, 0.55)
+	light.color = Color(1.0, 0.72, 0.4)
 	light.energy = 0.0
 	light.name = "Light"
 	add_child(light)
@@ -36,4 +36,4 @@ func _ready() -> void:
 func set_light(darkness: float) -> void:
 	var light := get_node_or_null("Light") as PointLight2D
 	if light:
-		light.energy = clampf(darkness, 0.0, 1.0) * 0.6
+		light.energy = clampf(darkness, 0.0, 1.0) * 0.5

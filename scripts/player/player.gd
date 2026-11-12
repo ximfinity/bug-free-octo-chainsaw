@@ -84,8 +84,8 @@ func _ready() -> void:
 	add_child(bite_icon)
 	light = PointLight2D.new()
 	light.texture = Art.light_texture()
-	light.texture_scale = 1.3
-	light.color = Color(1.0, 0.95, 0.85)
+	light.texture_scale = 1.0
+	light.color = Color(1.0, 0.82, 0.55)
 	light.energy = 0.0
 	add_child(light)
 	camera = Camera2D.new()

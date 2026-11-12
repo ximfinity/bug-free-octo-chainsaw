@@ -67,8 +67,9 @@ static func make_wake() -> CPUParticles2D:
 static func make_sparkles() -> CPUParticles2D:
 	var p := CPUParticles2D.new()
 	p.texture = Art.prop(Art.SPARKLE)
-	p.amount = 7
-	p.lifetime = 1.2
+	p.amount = 10
+	p.lifetime = 1.6
+	p.explosiveness = 0.0
 	p.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
 	p.emission_sphere_radius = 13.0
 	p.direction = Vector2(0, -1)
@@ -76,8 +77,8 @@ static func make_sparkles() -> CPUParticles2D:
 	p.initial_velocity_min = 4.0
 	p.initial_velocity_max = 10.0
 	p.gravity = Vector2.ZERO
-	p.scale_amount_min = 0.3
-	p.scale_amount_max = 0.55
+	p.scale_amount_min = 0.45
+	p.scale_amount_max = 0.8
 	var curve := Curve.new()
 	curve.add_point(Vector2(0.0, 0.0))
 	curve.add_point(Vector2(0.4, 1.0))
@@ -87,4 +88,28 @@ static func make_sparkles() -> CPUParticles2D:
 	var mat := CanvasItemMaterial.new()
 	mat.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
 	p.material = mat
+	# Slow golden motes drifting upward, so the spot reads from a distance.
+	var motes := CPUParticles2D.new()
+	motes.texture = Art.dot_texture()
+	motes.amount = 12
+	motes.lifetime = 2.0
+	motes.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
+	motes.emission_sphere_radius = 12.0
+	motes.direction = Vector2(0, -1)
+	motes.spread = 15.0
+	motes.initial_velocity_min = 10.0
+	motes.initial_velocity_max = 22.0
+	motes.gravity = Vector2.ZERO
+	motes.scale_amount_min = 1.5
+	motes.scale_amount_max = 2.5
+	var ramp := Gradient.new()
+	ramp.set_color(0, Color(1.0, 0.95, 0.55, 1.0))
+	ramp.set_color(1, Color(1.0, 0.75, 0.2, 0.0))
+	motes.color_ramp = ramp
+	var mmat := CanvasItemMaterial.new()
+	mmat.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
+	motes.material = mmat
+	motes.use_parent_material = false
+	p.add_child(motes)
+	p.set_meta("motes", motes)
 	return p

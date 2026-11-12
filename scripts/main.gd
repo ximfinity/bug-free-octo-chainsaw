@@ -551,9 +551,11 @@ func _draw_hints() -> void:
 	# Soft golden glow on the ground under nearby buried treasure.
 	for sp in sparkles:
 		if sp.emitting:
-			var a: float = sp.modulate.a * (0.22 + 0.12 * sin(Time.get_ticks_msec() / 300.0))
-			hint_layer.draw_circle(sp.position + Vector2(0, 6), 15.0, Color(1.0, 0.85, 0.3, a))
-			hint_layer.draw_circle(sp.position + Vector2(0, 6), 8.0, Color(1.0, 0.95, 0.6, a * 1.5))
+			var a: float = sp.modulate.a * (0.75 + 0.25 * sin(Time.get_ticks_msec() / 300.0))
+			var c: Vector2 = sp.position + Vector2(0, 6)
+			hint_layer.draw_circle(c, 22.0, Color(1.0, 0.8, 0.25, 0.18 * a))
+			hint_layer.draw_circle(c, 14.0, Color(1.0, 0.87, 0.35, 0.3 * a))
+			hint_layer.draw_circle(c, 7.0, Color(1.0, 0.97, 0.7, 0.45 * a))
 	for i in dug:
 		var tile := Vector2i(i % world.width, i / world.width)
 		if absi(tile.x - pt.x) < 30 and absi(tile.y - pt.y) < 20:
@@ -587,9 +589,13 @@ func _update_sparkles() -> void:
 			var d: int = near[k][0]
 			sp.position = world.tile_center(tile) + Vector2(0, -4)
 			sp.emitting = true
-			sp.modulate = Color(1, 1, 1, clampf(1.15 - float(d) / float(SPARKLE_RANGE + 1), 0.35, 1.0))
+			sp.modulate = Color(1, 1, 1, clampf(1.2 - float(d) / float(SPARKLE_RANGE + 1), 0.6, 1.0))
+			if sp.has_meta("motes"):
+				(sp.get_meta("motes") as CPUParticles2D).emitting = true
 		else:
 			sp.emitting = false
+			if sp.has_meta("motes"):
+				(sp.get_meta("motes") as CPUParticles2D).emitting = false
 	hint_layer.queue_redraw()
 
 
