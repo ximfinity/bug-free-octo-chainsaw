@@ -257,11 +257,11 @@ def make_terrain():
                 tufts(img, rnd, rgb("#c2db76"), 10)
                 dots(img, rnd, [rgb("#8a8a7a")], 3, 2)
             elif tid == ROCKY:
-                img = ground(rgb("#a7ad8e"), 0.08, seed)
+                img = ground(rgb("#a9b388"), 0.08, seed)
                 dots(img, rnd, [rgb("#8d8f86"), rgb("#c9c9bd")], 10, 2)
                 tufts(img, rnd, rgb("#86b05a"), 6)
             elif tid == MOUNTAIN:
-                img = ground(rgb("#8c8494"), 0.1, seed)
+                img = ground(rgb("#7a6e80"), 0.1, seed)
                 for _ in range(4):  # cracks
                     x, y = rnd.randrange(T), rnd.randrange(T)
                     for k in range(rnd.randint(3, 6)):
@@ -681,6 +681,37 @@ def tuft(cv, rnd):
         cv.line(x, FY - 2, x + rnd.uniform(-2, 2), FY - 9 - rnd.uniform(0, 3), rgb("#8ee05e"), 1.2)
 
 
+def peak(cv, rnd, variant, snowy):
+    """A rocky mountain peak filling most of the cell, foot at FY."""
+    rock, rock_l, rock_d = rgb("#8f8496"), rgb("#b9adbd"), rgb("#5e5468")
+    if snowy:
+        rock, rock_l, rock_d = rgb("#a59bb0"), rgb("#d6cee0"), rgb("#6e6480")
+    w = [26, 22, 24][variant]
+    h = [42, 36, 46][variant]
+    px = FX + [0, -3, 3][variant]
+    base_y = FY + 4
+    top = (px, base_y - h)
+    cv.poly([(FX - w - 2, base_y), top, (FX + w + 2, base_y)], rock_d)
+    cv.poly([(FX - w, base_y), top, (px + 3, base_y)], rock_l)
+    cv.poly([(px + 1, base_y), top, (FX + w, base_y)], rock)
+    # secondary ridge
+    sx = FX + [12, -14, -12][variant]
+    sh = h * 0.55
+    cv.poly([(sx - 12, base_y), (sx, base_y - sh), (sx + 12, base_y)], rock_d)
+    cv.poly([(sx - 10, base_y), (sx, base_y - sh), (sx + 1, base_y)], rock_l)
+    # cracks / strata
+    for k in range(3):
+        y = base_y - h * (0.25 + k * 0.2)
+        cv.line(px - 6 + k * 3, y, px + 4 + k * 2, y + 3, rock_d, 1.0)
+    # snow cap
+    cap = h * (0.55 if snowy else 0.3)
+    t = cap / h
+    cv.poly([(px - w * t, top[1] + cap), top, (px + w * t, top[1] + cap),
+             (px + w * t * 0.4, top[1] + cap * 0.8), (px, top[1] + cap * 0.95),
+             (px - w * t * 0.5, top[1] + cap * 0.75)], rgb("#f4f8ff"))
+    cv.poly([(px + 1, top[1] + 2), top, (px + w * t, top[1] + cap), (px + w * t * 0.4, top[1] + cap * 0.8)], rgb("#cfdcf0"))
+
+
 # name -> (drawer, tall).  tall decor is y-sorted with the player.
 DECOR = [
     ("pine0", lambda c, r: tree_pine(c, r), True),
@@ -711,6 +742,11 @@ DECOR = [
     ("lilyflower", lambda c, r: lily(c, r, True), False),
     ("driftwood", driftwood, False),
     ("tuft", tuft, False),
+    ("peak0", lambda c, r: peak(c, r, 0, False), True),
+    ("peak1", lambda c, r: peak(c, r, 1, False), True),
+    ("peak2", lambda c, r: peak(c, r, 2, False), True),
+    ("snowpeak0", lambda c, r: peak(c, r, 0, True), True),
+    ("snowpeak1", lambda c, r: peak(c, r, 2, True), True),
 ]
 
 
@@ -722,7 +758,7 @@ def make_decor():
         cv = Canvas(64, 64)
         fn(cv, random.Random(i * 13 + 5))
         is_tree = name.startswith(("pine", "birch", "maple", "oak", "willow", "snow", "snag"))
-        sh = (FX, FY, 12, 3.5) if is_tree else ((FX, FY - 1, 9, 2.5) if tall else None)
+        sh = (FX, FY, 12, 3.5) if is_tree else ((FX, FY - 1, 9, 2.5) if tall and not name.startswith(("peak", "snowpeak")) else None)
         atlas.paste(cv.finish(True, sh), ((i % cols) * 64, (i // cols) * 64))
     atlas.save(OUT / "decor.png")
     # index list for GDScript

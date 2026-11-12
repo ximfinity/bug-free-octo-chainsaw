@@ -27,3 +27,8 @@
 25 lilyflower flat
 26 driftwood flat
 27 tuft flat
+28 peak0 tall
+29 peak1 tall
+30 peak2 tall
+31 snowpeak0 tall
+32 snowpeak1 tall

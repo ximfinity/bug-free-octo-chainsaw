@@ -174,6 +174,13 @@ func _run() -> void:
 	await frames(40)
 	await shot("10_treasure_shimmer")
 
+	# 10b. Mountains.
+	var mtn: Vector2i = find_tile(func(x, y): return w.get_tile(x, y) == Tiles.MOUNTAIN and w.is_walkable(x + 4, y + 3))
+	if mtn.x >= 0:
+		walk_to(mtn + Vector2i(4, 3), Vector2.UP)
+		await frames(20)
+		await shot("10b_mountains")
+
 	# 11. Map screen and store screen.
 	main.open_screen(main.map_screen)
 	await frames(10)

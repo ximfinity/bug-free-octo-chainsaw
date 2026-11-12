@@ -24,8 +24,9 @@ func _ready() -> void:
 	add_child(fire_sprite)
 	light = PointLight2D.new()
 	light.texture = Art.light_texture()
-	light.texture_scale = 2.6
-	light.color = Color(1.0, 0.68, 0.38)
+	light.texture_scale = 2.2
+	light.energy = 0.75
+	light.color = Color(1.0, 0.62, 0.32)
 	light.position = Vector2(20, -6)
 	add_child(light)
 	set_lit(lit)
@@ -48,4 +49,4 @@ func _process(delta: float) -> void:
 		return
 	_anim += delta
 	fire_sprite.texture = Art.prop(Art.FIRE_A if int(_anim * 6.0) % 2 == 0 else Art.FIRE_B)
-	light.energy = 1.0 + sin(_anim * 9.0) * 0.08 + sin(_anim * 23.0) * 0.05
+	light.energy = 0.75 + sin(_anim * 9.0) * 0.06 + sin(_anim * 23.0) * 0.04

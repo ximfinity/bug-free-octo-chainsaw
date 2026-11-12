@@ -229,7 +229,7 @@ func _process(delta: float) -> void:
 		_update_sparkles()
 	_hint_timer -= delta
 	if _hint_timer <= 0.0:
-		_hint_timer = 0.2
+		_hint_timer = 0.05
 		hint_layer.queue_redraw()
 
 
@@ -548,6 +548,12 @@ func _draw_hints() -> void:
 	var hole_tex: Texture2D = Art.prop(Art.HOLE)
 	var x_tex: Texture2D = Art.prop(Art.X_MARK)
 	var pulse: float = 0.75 + 0.25 * sin(Time.get_ticks_msec() / 250.0)
+	# Soft golden glow on the ground under nearby buried treasure.
+	for sp in sparkles:
+		if sp.emitting:
+			var a: float = sp.modulate.a * (0.22 + 0.12 * sin(Time.get_ticks_msec() / 300.0))
+			hint_layer.draw_circle(sp.position + Vector2(0, 6), 15.0, Color(1.0, 0.85, 0.3, a))
+			hint_layer.draw_circle(sp.position + Vector2(0, 6), 8.0, Color(1.0, 0.95, 0.6, a * 1.5))
 	for i in dug:
 		var tile := Vector2i(i % world.width, i / world.width)
 		if absi(tile.x - pt.x) < 30 and absi(tile.y - pt.y) < 20:

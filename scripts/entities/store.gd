@@ -36,4 +36,4 @@ func _ready() -> void:
 func set_light(darkness: float) -> void:
 	var light := get_node_or_null("Light") as PointLight2D
 	if light:
-		light.energy = clampf(darkness, 0.0, 1.0) * 0.9
+		light.energy = clampf(darkness, 0.0, 1.0) * 0.6

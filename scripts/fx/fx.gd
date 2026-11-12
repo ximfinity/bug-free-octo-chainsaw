@@ -67,25 +67,24 @@ static func make_wake() -> CPUParticles2D:
 static func make_sparkles() -> CPUParticles2D:
 	var p := CPUParticles2D.new()
 	p.texture = Art.prop(Art.SPARKLE)
-	p.amount = 5
-	p.lifetime = 1.3
+	p.amount = 7
+	p.lifetime = 1.2
 	p.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
-	p.emission_sphere_radius = 11.0
+	p.emission_sphere_radius = 13.0
 	p.direction = Vector2(0, -1)
 	p.spread = 30.0
 	p.initial_velocity_min = 4.0
 	p.initial_velocity_max = 10.0
 	p.gravity = Vector2.ZERO
-	p.scale_amount_min = 0.12
-	p.scale_amount_max = 0.3
+	p.scale_amount_min = 0.3
+	p.scale_amount_max = 0.55
 	var curve := Curve.new()
 	curve.add_point(Vector2(0.0, 0.0))
 	curve.add_point(Vector2(0.4, 1.0))
 	curve.add_point(Vector2(1.0, 0.0))
 	p.scale_amount_curve = curve
-	p.color = Color(1.0, 0.95, 0.6)
+	p.color = Color(1.0, 0.86, 0.3)
 	var mat := CanvasItemMaterial.new()
 	mat.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
-	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 	p.material = mat
 	return p

@@ -604,7 +604,7 @@ func eat_best() -> void:
 
 # ----------------------------------------------------------------- visuals
 func _update_visuals(delta: float) -> void:
-	light.energy = main.day_night.darkness() * 0.85
+	light.energy = main.day_night.darkness() * 0.5
 	match mode:
 		Mode.PADDLING:
 			sprite.visible = false

@@ -412,6 +412,10 @@ static func _place_decor(wd: WorldData, moist: PackedFloat32Array) -> void:
 					elif r < 0.18: d = Decor.SNAG
 					elif r < 0.21: d = Decor.TUFT
 					elif r < 0.23: d = Decor.SNOWPINE
+				Tiles.MOUNTAIN:
+					if r < 0.72: d = Decor.PEAK0 + int(hash01(x, y, s + 3) * 3.0)
+				Tiles.SNOW:
+					if r < 0.72: d = Decor.SNOWPEAK0 + v
 				Tiles.SAND:
 					if r < 0.03: d = Decor.DRIFTWOOD
 					elif r < 0.04: d = Decor.ROCK

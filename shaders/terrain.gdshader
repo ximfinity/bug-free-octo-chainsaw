@@ -73,7 +73,7 @@ void fragment() {
 	// sun glints
 	float g1 = texture(noise_tex, px * 1.3 + vec2(TIME * 0.11, -TIME * 0.07)).r;
 	float g2 = texture(noise_tex, px * 1.1 - vec2(TIME * 0.05, TIME * 0.09)).g;
-	water += vec3(0.5) * step(0.72, g1 * g2 * 1.25) * daylight;
+	water += vec3(0.45) * step(0.86, g1 * g2 * 1.25) * daylight * smoothstep(0.15, 0.5, depth);
 	// river current streaks
 	if (river > 0.05) {
 		vec2 fd = length(flow) > 0.05 ? normalize(flow) : vec2(1.0, 0.0);

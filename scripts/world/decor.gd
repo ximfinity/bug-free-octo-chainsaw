@@ -30,9 +30,16 @@ const LILY := 24
 const LILYFLOWER := 25
 const DRIFTWOOD := 26
 const TUFT := 27
-const COUNT := 28
-## The first TALL_COUNT ids are tall and y-sorted with characters.
-const TALL_COUNT := 16
+const PEAK0 := 28
+const PEAK1 := 29
+const PEAK2 := 30
+const SNOWPEAK0 := 31
+const SNOWPEAK1 := 32
+const COUNT := 33
+## Ids below FLAT_START are tall; FLAT_START..FLAT_END are flat ground cover;
+## ids after FLAT_END (mountain peaks) are tall again.
+const FLAT_START := 16
+const FLAT_END := 27
 const COLUMNS := 8
 
 ## Trees you can chop for firewood.
@@ -40,7 +47,7 @@ const TREES := [PINE0, PINE1, BIRCH0, BIRCH1, MAPLE0, MAPLE1, OAK0, OAK1, WILLOW
 
 
 static func is_tall(id: int) -> bool:
-	return id >= 0 and id < TALL_COUNT
+	return id >= 0 and id < COUNT and (id < FLAT_START or id > FLAT_END)
 
 
 static func is_tree(id: int) -> bool:
