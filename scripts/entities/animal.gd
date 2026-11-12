@@ -5,17 +5,17 @@ const Art = preload("res://scripts/art.gd")
 const Tiles = preload("res://scripts/world/tiles.gd")
 
 const KINDS := {
-	"rabbit": {"sprite": 3, "hp": 1, "speed": 30.0, "flee_speed": 85.0, "water": false,
+	"rabbit": {"hp": 1, "speed": 60.0, "flee_speed": 170.0, "water": false,
 		"drops": [["meat_raw", 1, 1], ["hide", 0, 1]]},
-	"deer": {"sprite": 4, "hp": 3, "speed": 26.0, "flee_speed": 78.0, "water": false,
+	"deer": {"hp": 3, "speed": 52.0, "flee_speed": 156.0, "water": false,
 		"drops": [["meat_raw", 2, 3], ["hide", 1, 2]]},
-	"duck": {"sprite": 5, "hp": 1, "speed": 16.0, "flee_speed": 48.0, "water": true,
+	"duck": {"hp": 1, "speed": 32.0, "flee_speed": 96.0, "water": true,
 		"drops": [["meat_raw", 1, 1]]},
-	"wolf": {"sprite": 6, "hp": 3, "speed": 30.0, "flee_speed": 75.0, "water": false,
+	"wolf": {"hp": 3, "speed": 60.0, "flee_speed": 150.0, "water": false,
 		"drops": [["hide", 1, 2]], "predator": true},
 }
-const FLEE_RADIUS := 72.0
-const CHASE_RADIUS := 150.0
+const FLEE_RADIUS := 144.0
+const CHASE_RADIUS := 300.0
 const BITE_DAMAGE := 12.0
 
 var kind: String = "rabbit"
@@ -38,8 +38,8 @@ func _ready() -> void:
 	data = KINDS[kind]
 	hp = int(data["hp"])
 	sprite = Sprite2D.new()
-	sprite.texture = Art.sprite(int(data["sprite"]))
-	sprite.offset = Vector2(0, -7)
+	sprite.texture = Art.creature_frame(kind, 0)
+	sprite.offset = Vector2(0, -20)
 	add_child(sprite)
 	_timer = randf_range(0.5, 2.0)
 
@@ -79,7 +79,7 @@ func _process(delta: float) -> void:
 		elif dist < CHASE_RADIUS and player_on_land and not safe:
 			dir = to_player.normalized()
 			speed = float(data["flee_speed"]) * 0.85
-			if dist < 12.0 and _attack_cd <= 0.0:
+			if dist < 24.0 and _attack_cd <= 0.0:
 				player.take_damage(BITE_DAMAGE)
 				_attack_cd = 1.1
 		else:
@@ -109,7 +109,8 @@ func _process(delta: float) -> void:
 			dir = dir.rotated(randf_range(1.5, 4.7))
 		if absf(dir.x) > 0.1:
 			sprite.flip_h = dir.x < 0
-		sprite.position.y = -absf(sin(_anim * 12.0)) * 1.5 if speed > 40.0 else 0.0
+		sprite.position.y = -roundf(absf(sin(_anim * 12.0)) * 3.0) if speed > 80.0 else 0.0
+		sprite.texture = Art.creature_frame(kind, int(_anim * (10.0 if speed > 80.0 else 5.0)) % 2)
 
 
 func _wander() -> void:
@@ -127,7 +128,7 @@ func hit(damage: int, from_dir: Vector2) -> void:
 	hp -= damage
 	_flash = 0.15
 	_flee_timer = 3.0
-	position += from_dir * 3.0
+	position += from_dir * 6.0
 	if hp <= 0:
 		_die()
 
@@ -137,7 +138,7 @@ func _die() -> void:
 	for d in data["drops"]:
 		var amount: int = randi_range(int(d[1]), int(d[2]))
 		if amount > 0:
-			main.spawn_pickup(d[0], amount, position + Vector2(randf_range(-6, 6), randf_range(-4, 4)))
+			main.spawn_pickup(d[0], amount, position + Vector2(randf_range(-12, 12), randf_range(-8, 8)))
 	main.stats["kills"] = int(main.stats.get("kills", 0)) + 1
 	var tw := create_tween()
 	tw.tween_property(self, "modulate:a", 0.0, 0.4)

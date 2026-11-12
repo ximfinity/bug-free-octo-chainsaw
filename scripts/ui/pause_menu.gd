@@ -34,6 +34,7 @@ func _ready() -> void:
 		main.save_game()
 		GameState.quit_to_title()))
 	content.add_child(HSeparator.new())
+	content.add_child(UI.label("Tip: the bar at the bottom of the screen always shows what you can do.", 8, Color(1.0, 0.9, 0.6)))
 	controls_label = UI.label(CONTROLS, 8, Color(0.85, 0.85, 0.8))
 	content.add_child(controls_label)
 

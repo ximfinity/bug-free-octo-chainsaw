@@ -22,7 +22,7 @@ func _ready() -> void:
 	var hb := HBoxContainer.new()
 	content.add_child(hb)
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(270, 190)
+	scroll.custom_minimum_size = Vector2(540, 380)
 	hb.add_child(scroll)
 	list = GridContainer.new()
 	list.columns = 1
@@ -30,7 +30,7 @@ func _ready() -> void:
 	scroll.add_child(list)
 	hb.add_child(VSeparator.new())
 	craft_box = VBoxContainer.new()
-	craft_box.custom_minimum_size = Vector2(140, 0)
+	craft_box.custom_minimum_size = Vector2(280, 0)
 	hb.add_child(craft_box)
 	content.add_child(UI.button("Close (Tab)", func(): main.close_screen()))
 
@@ -56,7 +56,7 @@ func refresh() -> void:
 		var row := HBoxContainer.new()
 		row.add_child(UI.icon(int(info.get("icon", 12)), 16))
 		var name_l := UI.label("%s x%d" % [info.get("name", id), p.inventory.count(id)], 10)
-		name_l.custom_minimum_size = Vector2(130, 0)
+		name_l.custom_minimum_size = Vector2(260, 0)
 		row.add_child(name_l)
 		if float(info.get("food", 0)) > 0.0:
 			var eat_id: String = id

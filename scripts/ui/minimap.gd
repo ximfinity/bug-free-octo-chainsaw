@@ -1,7 +1,8 @@
 extends Control
 ## Corner minimap centred on the player, drawn from the exploration image.
 
-const ZOOM := 2.0
+const ZOOM := 4.0
+const TILE := 32.0
 
 var main
 
@@ -18,7 +19,7 @@ func _draw() -> void:
 	var ex = main.exploration
 	var w = main.world
 	var view_tiles: Vector2 = size / ZOOM
-	var pt: Vector2 = main.player.position / 16.0
+	var pt: Vector2 = main.player.position / TILE
 	var origin: Vector2 = pt - view_tiles * 0.5
 	origin.x = clampf(origin.x, 0.0, maxf(0.0, w.width - view_tiles.x))
 	origin.y = clampf(origin.y, 0.0, maxf(0.0, w.height - view_tiles.y))
@@ -27,28 +28,28 @@ func _draw() -> void:
 	for i in w.stores.size():
 		var s: Vector2i = w.stores[i]
 		if ex.is_discovered(s):
-			_marker(Vector2(s) + Vector2(0.5, 0.5), origin, Color(0.2, 0.55, 1.0), 3.0)
+			_marker(Vector2(s) + Vector2(0.5, 0.5), origin, Color(0.2, 0.55, 1.0), 6.0)
 	if main.camp != null:
-		_marker(main.camp.position / 16.0, origin, Color(1.0, 0.55, 0.15), 2.5)
+		_marker(main.camp.position / TILE, origin, Color(1.0, 0.55, 0.15), 5.0)
 	for idx in main.revealed_treasures:
 		if not main.dug.has(idx):
 			var tp: Vector2 = Vector2(idx % w.width, idx / w.width) + Vector2(0.5, 0.5)
 			_cross(tp, origin, Color(0.9, 0.1, 0.1))
 	if main.kayak != null and not main.player.is_paddling() and not main.player.is_carrying():
-		_marker(main.kayak.position / 16.0, origin, Color(1.0, 0.85, 0.2), 2.0)
-	_marker(pt, origin, Color.WHITE, 2.5)
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0.85, 0.72, 0.42), false, 1.0)
+		_marker(main.kayak.position / TILE, origin, Color(1.0, 0.85, 0.2), 4.5)
+	_marker(pt, origin, Color.WHITE, 5.0)
+	draw_rect(Rect2(Vector2.ZERO, size), Color(1.0, 0.8, 0.45), false, 3.0)
 
 
 func _marker(tile_pos: Vector2, origin: Vector2, color: Color, r: float) -> void:
 	var p: Vector2 = (tile_pos - origin) * ZOOM
-	if p.x < -4 or p.y < -4 or p.x > size.x + 4 or p.y > size.y + 4:
+	if p.x < -8 or p.y < -8 or p.x > size.x + 8 or p.y > size.y + 8:
 		return
-	draw_circle(p, r + 1.0, Color.BLACK)
+	draw_circle(p, r + 2.0, Color(0.13, 0.11, 0.17))
 	draw_circle(p, r, color)
 
 
 func _cross(tile_pos: Vector2, origin: Vector2, color: Color) -> void:
 	var p: Vector2 = (tile_pos - origin) * ZOOM
-	draw_line(p + Vector2(-3, -3), p + Vector2(3, 3), color, 1.5)
-	draw_line(p + Vector2(-3, 3), p + Vector2(3, -3), color, 1.5)
+	draw_line(p + Vector2(-6, -6), p + Vector2(6, 6), color, 3.0)
+	draw_line(p + Vector2(-6, 6), p + Vector2(6, -6), color, 3.0)

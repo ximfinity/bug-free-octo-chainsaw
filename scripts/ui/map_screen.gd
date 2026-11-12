@@ -16,27 +16,27 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	info = UI.outlined("", 9)
-	UI.place(info, 0, 1, 1, 1, 8, -30, -8, -4)
+	UI.place(info, 0, 1, 1, 1, 16, -60, -16, -8)
 	add_child(info)
 
 
 func open() -> void:
 	visible = true
 	zoom = 1.0
-	center = main.player.position / 16.0
+	center = main.player.position / 32.0
 	queue_redraw()
 
 
 func _fit_scale() -> float:
 	var w = main.world
-	return minf((size.x - 20.0) / w.width, (size.y - 50.0) / w.height)
+	return minf((size.x - 40.0) / w.width, (size.y - 100.0) / w.height)
 
 
 func _map_rect_origin() -> Vector2:
 	var s: float = _fit_scale() * zoom
 	var w = main.world
 	if zoom <= 1.0:
-		return (size - Vector2(w.width, w.height) * s) * 0.5 + Vector2(0, -10)
+		return (size - Vector2(w.width, w.height) * s) * 0.5 + Vector2(0, -20)
 	return size * 0.5 - center * s
 
 
@@ -77,7 +77,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0.12, 0.1, 0.08, 0.96))
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.13, 0.11, 0.17, 0.97))
 	if main == null:
 		return
 	var w = main.world
@@ -87,35 +87,35 @@ func _draw() -> void:
 	var o: Vector2 = _map_rect_origin()
 	var rect := Rect2(o, Vector2(w.width, w.height) * s)
 	draw_texture_rect(ex.texture, rect, false)
-	draw_rect(rect, Color(0.85, 0.72, 0.42), false, 1.0)
+	draw_rect(rect, Color(1.0, 0.8, 0.45), false, 3.0)
 	var font: Font = get_theme_default_font()
 	for i in w.stores.size():
 		var st: Vector2i = w.stores[i]
 		if ex.is_discovered(st):
 			var p: Vector2 = o + (Vector2(st) + Vector2(0.5, 0.5)) * s
-			draw_rect(Rect2(p - Vector2(3, 3), Vector2(6, 6)), Color(0.2, 0.55, 1.0))
-			draw_rect(Rect2(p - Vector2(3, 3), Vector2(6, 6)), Color.BLACK, false, 1.0)
+			draw_rect(Rect2(p - Vector2(6, 6), Vector2(12, 12)), Color(0.2, 0.55, 1.0))
+			draw_rect(Rect2(p - Vector2(6, 6), Vector2(12, 12)), Color.BLACK, false, 1.0)
 			if zoom >= 2.0:
-				draw_string_outline(font, p + Vector2(5, -3), "100's of Kayaks", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, 3, Color.BLACK)
-				draw_string(font, p + Vector2(5, -3), "100's of Kayaks", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.75, 0.9, 1.0))
+				draw_string_outline(font, p + Vector2(10, -6), "100's of Kayaks", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, 5, Color.BLACK)
+				draw_string(font, p + Vector2(10, -6), "100's of Kayaks", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.75, 0.9, 1.0))
 	for idx in main.revealed_treasures:
 		if main.dug.has(idx):
 			continue
 		var tp: Vector2 = o + (Vector2(idx % w.width, idx / w.width) + Vector2(0.5, 0.5)) * s
-		draw_line(tp + Vector2(-4, -4), tp + Vector2(4, 4), Color(0.9, 0.1, 0.1), 2.0)
-		draw_line(tp + Vector2(-4, 4), tp + Vector2(4, -4), Color(0.9, 0.1, 0.1), 2.0)
+		draw_line(tp + Vector2(-8, -8), tp + Vector2(8, 8), Color(0.9, 0.1, 0.1), 4.0)
+		draw_line(tp + Vector2(-8, 8), tp + Vector2(8, -8), Color(0.9, 0.1, 0.1), 4.0)
 	if main.camp != null:
-		var cp: Vector2 = o + main.camp.position / 16.0 * s
-		draw_circle(cp, 4.0, Color.BLACK)
-		draw_circle(cp, 3.0, Color(1.0, 0.55, 0.15))
+		var cp: Vector2 = o + main.camp.position / 32.0 * s
+		draw_circle(cp, 8.0, Color.BLACK)
+		draw_circle(cp, 6.0, Color(1.0, 0.55, 0.15))
 	if not main.player.is_paddling() and not main.player.is_carrying():
-		var kp: Vector2 = o + main.kayak.position / 16.0 * s
-		draw_circle(kp, 3.5, Color.BLACK)
-		draw_circle(kp, 2.5, Color(1.0, 0.85, 0.2))
-	var pp: Vector2 = o + main.player.position / 16.0 * s
+		var kp: Vector2 = o + main.kayak.position / 32.0 * s
+		draw_circle(kp, 7.0, Color.BLACK)
+		draw_circle(kp, 5.0, Color(1.0, 0.85, 0.2))
+	var pp: Vector2 = o + main.player.position / 32.0 * s
 	var blink: bool = int(Time.get_ticks_msec() / 400) % 2 == 0
-	draw_circle(pp, 4.0, Color.BLACK)
-	draw_circle(pp, 3.0, Color.WHITE if blink else Color(1.0, 0.3, 0.3))
+	draw_circle(pp, 8.0, Color.BLACK)
+	draw_circle(pp, 6.0, Color.WHITE if blink else Color(1.0, 0.3, 0.3))
 	info.text = "Explored %.1f%%    Blue: 100's of Kayaks   Yellow: kayak   Orange: camp   Red X: treasure    Wheel: zoom   Drag: pan   M: close" % ex.percent()
 
 

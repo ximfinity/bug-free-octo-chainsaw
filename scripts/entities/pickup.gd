@@ -15,22 +15,21 @@ var sprite: Sprite2D
 
 func _ready() -> void:
 	sprite = Sprite2D.new()
-	sprite.texture = Art.sprite(int(ItemDB.item(item_id).get("icon", Art.CHEST)))
-	sprite.scale = Vector2(0.75, 0.75)
-	sprite.offset = Vector2(0, -8)
+	sprite.texture = Art.item(int(ItemDB.item(item_id).get("icon", 13)))
+	sprite.offset = Vector2(0, -16)
 	add_child(sprite)
 
 
 func _process(delta: float) -> void:
 	_t += delta
 	_full_warned -= delta
-	sprite.position.y = sin(_t * 4.0) * 1.5
+	sprite.position.y = roundf(sin(_t * 4.0) * 3.0)
 	if _t > LIFETIME:
 		queue_free()
 		return
 	if main == null or main.player == null:
 		return
-	if position.distance_to(main.player.position) < 14.0:
+	if position.distance_to(main.player.position) < 28.0:
 		var added: int = main.player.inventory.add(item_id, amount)
 		if added > 0:
 			main.message("+%d %s" % [added, ItemDB.item_name(item_id)])

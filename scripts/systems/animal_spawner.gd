@@ -6,7 +6,7 @@ const AnimalScript = preload("res://scripts/entities/animal.gd")
 
 const SPAWN_MIN := 22
 const SPAWN_MAX := 34
-const DESPAWN_DIST := 48 * 16
+const DESPAWN_DIST := 48 * 32
 const MAX_PREY := 16
 const MAX_WOLVES := 5
 
@@ -49,18 +49,20 @@ func _try_spawn(predator: bool) -> void:
 		var tt: int = world.get_tile(t.x, t.y)
 		var kind: String = ""
 		if predator:
-			if tt == Tiles.GRASS or tt == Tiles.FOREST or tt == Tiles.HILL:
+			if tt == Tiles.GRASS or Tiles.is_forest(tt) or tt == Tiles.HILL or tt == Tiles.ROCKY:
 				kind = "wolf"
 		else:
 			match tt:
 				Tiles.GRASS, Tiles.SAND:
 					kind = "rabbit" if randf() < 0.7 else "deer"
-				Tiles.FOREST:
+				Tiles.FOREST, Tiles.BIRCH, Tiles.MAPLE:
 					kind = "deer" if randf() < 0.6 else "rabbit"
+				Tiles.MEADOW:
+					kind = "rabbit" if randf() < 0.8 else "deer"
 				Tiles.SHALLOW, Tiles.DEEP:
 					if randf() < 0.5:
 						kind = "duck"
-				Tiles.HILL:
+				Tiles.HILL, Tiles.ROCKY:
 					if randf() < 0.4:
 						kind = "deer"
 		if kind == "":

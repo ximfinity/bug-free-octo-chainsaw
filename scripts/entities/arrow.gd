@@ -3,7 +3,7 @@ extends Node2D
 
 const Art = preload("res://scripts/art.gd")
 const Tiles = preload("res://scripts/world/tiles.gd")
-const SPEED := 280.0
+const SPEED := 560.0
 const LIFETIME := 0.85
 
 var direction: Vector2 = Vector2.RIGHT
@@ -13,7 +13,8 @@ var _t: float = 0.0
 
 func _ready() -> void:
 	var s := Sprite2D.new()
-	s.texture = Art.sprite(Art.ARROW)
+	s.texture = Art.prop(Art.ARROW)
+	s.scale = Vector2(0.6, 0.6)
 	add_child(s)
 	rotation = direction.angle()
 
@@ -29,7 +30,7 @@ func _process(delta: float) -> void:
 		queue_free()
 		return
 	for a in get_tree().get_nodes_in_group("animals"):
-		if a.alive and a.position.distance_to(position + Vector2(0, 6)) < 9.0:
+		if a.alive and a.position.distance_to(position + Vector2(0, 12)) < 20.0:
 			a.hit(1, direction)
 			queue_free()
 			return

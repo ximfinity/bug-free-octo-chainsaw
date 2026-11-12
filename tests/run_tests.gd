@@ -96,6 +96,24 @@ func test_world(seed_value: int, size: int) -> void:
 		var t: int = w.get_tile(p.x, p.y)
 		check(t != Tiles.MOUNTAIN and t != Tiles.SNOW and Tiles.walk_ok(t), tag + ": treasure on walkable land")
 	check(int(counts.get(Tiles.MOUNTAIN, 0)) > 0, tag + ": has mountains")
+	var biome_kinds: int = 0
+	for b in [Tiles.FOREST, Tiles.BIRCH, Tiles.MAPLE, Tiles.MEADOW, Tiles.GRASS, Tiles.ROCKY]:
+		if int(counts.get(b, 0)) > 0:
+			biome_kinds += 1
+	check(biome_kinds >= 4, tag + ": varied biomes (%d kinds)" % biome_kinds)
+	check(w.decor.size() == w.tiles.size(), tag + ": decor layer sized")
+	var decor_count: int = 0
+	for i in w.decor.size():
+		if w.decor[i] != 0:
+			decor_count += 1
+	check(decor_count > w.tiles.size() / 20, tag + ": plenty of plant life (%d)" % decor_count)
+	check(w.get_decor(w.start.x, w.start.y) == -1, tag + ": start tile clear of decor")
+	for dk in w.store_docks:
+		var dp: Vector2i = dk
+		check(w.get_decor(dp.x, dp.y) == -1, tag + ": store dock clear of decor")
+	for tr in w.treasures:
+		var tp: Vector2i = tr["pos"]
+		check(w.get_decor(tp.x, tp.y) == -1, tag + ": treasure tile clear of decor")
 	check(int(counts.get(Tiles.RIVER, 0)) > 0, tag + ": has rivers")
 	print("%s size %d: %d ms, water %.0f%%, %d stores, %d treasures" % [
 		tag, size, ms, water_frac * 100.0, w.stores.size(), w.treasures.size()])

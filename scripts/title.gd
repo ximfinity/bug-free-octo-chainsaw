@@ -15,14 +15,14 @@ func _ready() -> void:
 	theme = GameState.ui_theme
 	UI.place(self, 0, 0, 1, 1, 0, 0, 0, 0)
 	var bg := ColorRect.new()
-	bg.color = Color(0.11, 0.27, 0.45)
+	bg.color = Color(0.17, 0.53, 0.72)
 	UI.place(bg, 0, 0, 1, 1, 0, 0, 0, 0)
 	add_child(bg)
 	kayak_sprite = TextureRect.new()
-	kayak_sprite.texture = Art.kayak_frame(1, 1)
+	kayak_sprite.texture = Art.kayak_frame(1, 0, 1)
 	kayak_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	kayak_sprite.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	kayak_sprite.size = Vector2(96, 48)
+	kayak_sprite.size = Vector2(192, 192)
 	add_child(kayak_sprite)
 
 	var center := CenterContainer.new()
@@ -48,7 +48,7 @@ func _ready() -> void:
 	row.add_child(UI.label("Seed", 10))
 	seed_edit = LineEdit.new()
 	seed_edit.placeholder_text = "random"
-	seed_edit.custom_minimum_size = Vector2(120, 0)
+	seed_edit.custom_minimum_size = Vector2(240, 0)
 	row.add_child(seed_edit)
 	row.add_child(UI.label("World", 10))
 	size_option = OptionButton.new()
@@ -96,5 +96,5 @@ func _confirm_overwrite(seed_value: int, world_size: int) -> void:
 func _process(delta: float) -> void:
 	_t += delta
 	var w: float = size.x
-	kayak_sprite.position = Vector2(fmod(_t * 40.0, w + 200.0) - 100.0, size.y * 0.78 + sin(_t * 2.0) * 3.0)
-	kayak_sprite.texture = Art.kayak_frame(1, 1 + int(_t * 3.0) % 2)
+	kayak_sprite.position = Vector2(fmod(_t * 80.0, w + 400.0) - 200.0, size.y * 0.74 + sin(_t * 2.0) * 6.0)
+	kayak_sprite.texture = Art.kayak_frame(1, 0, 1 + int(_t * 4.0) % 4)

@@ -1,54 +1,81 @@
 extends RefCounted
-## Texture atlas helpers. Index constants match tools/gen_art.py.
+## Texture atlas helpers. Layouts match tools/gen_art.py.
 
-const SPRITES := preload("res://assets/sprites.png")
+const ITEMS := preload("res://assets/items.png")
+const PROPS := preload("res://assets/props.png")
 const KAYAK := preload("res://assets/kayak.png")
+const PLAYER := preload("res://assets/player.png")
+const CREATURES := preload("res://assets/creatures.png")
+const DECOR := preload("res://assets/decor.png")
 const STORE := preload("res://assets/store.png")
-const TILES := preload("res://assets/tiles.png")
+const TERRAIN := preload("res://assets/terrain.png")
+const WATER_NOISE := preload("res://assets/water_noise.png")
 
-const PLAYER_DOWN := 0
-const PLAYER_UP := 1
-const PLAYER_SIDE := 2
-const RABBIT := 3
-const DEER := 4
-const DUCK := 5
-const WOLF := 6
-const TENT := 7
-const FIRE_A := 8
-const FIRE_B := 9
-const FIRE_OUT := 10
-const ARROW := 11
-const CHEST := 12
-const DIG_HINT := 13
-const X_MARK := 14
-const FISH := 15
-const COIN := 32
-const BITE := 35
+# props.png (64x64 cells)
+const TENT := 0
+const FIRE_A := 1
+const FIRE_B := 2
+const FIRE_OUT := 3
+const CHEST := 4
+const X_MARK := 5
+const HOLE := 6
+const BITE := 7
+const ARROW := 8
+const SPARKLE := 9
+
+# items.png (32x32 icons)
+const ICON_ARROWS := 8
+const ICON_COIN := 18
+
+# player.png rows
+const VIEW_DOWN := 0
+const VIEW_UP := 1
+const VIEW_SIDE := 2
+
+const CREATURE_ROWS := {"rabbit": 0, "deer": 1, "duck": 2, "wolf": 3}
+const KAYAK_HEADINGS := 16
 
 static var _cache: Dictionary = {}
 static var _light_tex: Texture2D = null
+static var _dot_tex: Texture2D = null
 
 
-static func sprite(index: int) -> AtlasTexture:
-	if _cache.has(index):
-		return _cache[index]
-	var a := AtlasTexture.new()
-	a.atlas = SPRITES
-	a.region = Rect2((index % 8) * 16, (index / 8) * 16, 16, 16)
-	_cache[index] = a
-	return a
-
-
-## row = hull level (0..2), col = 0 empty, 1/2 paddle strokes
-static func kayak_frame(row: int, col: int) -> AtlasTexture:
-	var key: int = 10000 + row * 10 + col
+static func _region(atlas: Texture2D, key: String, rect: Rect2) -> AtlasTexture:
 	if _cache.has(key):
 		return _cache[key]
 	var a := AtlasTexture.new()
-	a.atlas = KAYAK
-	a.region = Rect2(col * 32, row * 16, 32, 16)
+	a.atlas = atlas
+	a.region = rect
 	_cache[key] = a
 	return a
+
+
+static func item(index: int) -> AtlasTexture:
+	return _region(ITEMS, "i%d" % index, Rect2((index % 8) * 32, (index / 8) * 32, 32, 32))
+
+
+static func prop(index: int) -> AtlasTexture:
+	return _region(PROPS, "p%d" % index, Rect2((index % 8) * 64, (index / 8) * 64, 64, 64))
+
+
+## hull 0..2, heading_index 0..15 (0 = east, clockwise), col 0 empty, 1..4 strokes
+static func kayak_frame(hull: int, heading_index: int, col: int) -> AtlasTexture:
+	var row: int = hull * KAYAK_HEADINGS + posmod(heading_index, KAYAK_HEADINGS)
+	return _region(KAYAK, "k%d_%d" % [row, col], Rect2(col * 64, row * 64, 64, 64))
+
+
+static func heading_index(angle: float) -> int:
+	return posmod(int(round(angle / (TAU / KAYAK_HEADINGS))), KAYAK_HEADINGS)
+
+
+## view 0 down / 1 up / 2 side(right); col 0..3 walk, 4..5 carry
+static func player_frame(view: int, col: int) -> AtlasTexture:
+	return _region(PLAYER, "pl%d_%d" % [view, col], Rect2(col * 32, view * 48, 32, 48))
+
+
+static func creature_frame(kind: String, frame: int) -> AtlasTexture:
+	var row: int = int(CREATURE_ROWS.get(kind, 0))
+	return _region(CREATURES, "c%d_%d" % [row, frame], Rect2(frame * 48, row * 48, 48, 48))
 
 
 static func light_texture() -> Texture2D:
@@ -63,7 +90,22 @@ static func light_texture() -> Texture2D:
 	t.fill = GradientTexture2D.FILL_RADIAL
 	t.fill_from = Vector2(0.5, 0.5)
 	t.fill_to = Vector2(1.0, 0.5)
-	t.width = 128
-	t.height = 128
+	t.width = 256
+	t.height = 256
 	_light_tex = t
 	return t
+
+
+## Small soft white dot used for wakes, splashes and sparkles.
+static func dot_texture() -> Texture2D:
+	if _dot_tex != null:
+		return _dot_tex
+	var img := Image.create(6, 6, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	for y in 6:
+		for x in 6:
+			var d: float = Vector2(x - 2.5, y - 2.5).length()
+			if d < 2.6:
+				img.set_pixel(x, y, Color(1, 1, 1, 1.0 if d < 1.6 else 0.6))
+	_dot_tex = ImageTexture.create_from_image(img)
+	return _dot_tex

@@ -48,12 +48,22 @@ func _run() -> void:
 	check(p.can_be_at(p.position, false), "player starts on walkable ground")
 	check(main.stores.size() >= 4, "stores spawned (%d)" % main.stores.size())
 
-	# Board, paddle a bit, get out.
+	var acts: Array = main.available_actions()
+	check(_has_action(acts, "board"), "action bar offers Board next to the kayak")
+	check(_has_action(acts, "map"), "action bar always offers the map")
+
+	# Board, paddle a bit, glide, get out.
 	p.try_board()
 	check(p.is_paddling(), "boarded kayak from the start dock")
-	Input.action_press("move_right")
-	await frames(30)
-	Input.action_release("move_right")
+	check(_has_action(main.available_actions(), "sprint"), "action bar offers Power stroke while paddling")
+	var dir_name: String = _open_water_direction(p, w)
+	Input.action_press(dir_name)
+	await frames(40)
+	Input.action_release(dir_name)
+	var spd_after_paddle: float = p.velocity.length()
+	check(spd_after_paddle > 20.0, "kayak builds up speed (%.0f px/s)" % spd_after_paddle)
+	await frames(10)
+	check(p.velocity.length() > 5.0 or not p.can_be_at(p.position, true), "kayak glides after paddling stops")
 	check(p.can_be_at(p.position, true), "kayak stays on water while paddling")
 	p.try_board()
 	await frames(2)
@@ -139,6 +149,28 @@ func _run() -> void:
 	check(int(data.get("seed", -1)) == 4242, "save has seed")
 	check((data.get("dug", []) as Array).size() == 1, "save has dug site")
 	_finish()
+
+
+func _has_action(acts: Array, action: String) -> bool:
+	for a in acts:
+		if str(a[0]) == action:
+			return true
+	return false
+
+
+## Which arrow direction from the start leads onto open water.
+func _open_water_direction(p, w) -> String:
+	var best: String = "move_right"
+	var best_n: int = -1
+	for pair in [["move_right", Vector2.RIGHT], ["move_left", Vector2.LEFT], ["move_up", Vector2.UP], ["move_down", Vector2.DOWN]]:
+		var n: int = 0
+		for k in range(1, 6):
+			if p.can_be_at(p.position + (pair[1] as Vector2) * 32.0 * k, true):
+				n += 1
+		if n > best_n:
+			best_n = n
+			best = pair[0]
+	return best
 
 
 func _finish() -> void:

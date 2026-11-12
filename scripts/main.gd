@@ -4,7 +4,9 @@ extends Node2D
 
 const Tiles = preload("res://scripts/world/tiles.gd")
 const WorldGen = preload("res://scripts/world/world_gen.gd")
-const WorldRenderer = preload("res://scripts/world/world_renderer.gd")
+const TerrainRenderer = preload("res://scripts/world/terrain_renderer.gd")
+const DecorLayer = preload("res://scripts/world/decor_layer.gd")
+const FX = preload("res://scripts/fx/fx.gd")
 const Art = preload("res://scripts/art.gd")
 const ItemDB = preload("res://scripts/data/item_db.gd")
 const UI = preload("res://scripts/ui/ui_util.gd")
@@ -22,8 +24,10 @@ const InventoryScreen = preload("res://scripts/ui/inventory_screen.gd")
 const StoreScreen = preload("res://scripts/ui/store_screen.gd")
 const PauseMenu = preload("res://scripts/ui/pause_menu.gd")
 
-const STORE_REACH := 34.0
-const CAMP_REACH := 28.0
+const STORE_REACH := 84.0
+const CAMP_REACH := 60.0
+const SPARKLE_RANGE := 7
+const SPARKLE_POOL := 6
 const REVEAL_LAND := 7
 const REVEAL_WATER := 10
 const REVEAL_HILL := 11
@@ -35,9 +39,11 @@ var day_night
 var exploration
 var spawner
 var entities: Node2D
-var ground: TileMapLayer
-var overlay: TileMapLayer
+var ground
+var flat_decor
+var tall_decor
 var hint_layer: Node2D
+var sparkles: Array = []
 var stores: Array = []
 var store_seen: Array = []
 var camp = null
@@ -68,10 +74,10 @@ func _ready() -> void:
 	ui_layer.layer = 10
 	add_child(ui_layer)
 	var loading := ColorRect.new()
-	loading.color = Color(0.08, 0.16, 0.26)
+	loading.color = Color(0.17, 0.53, 0.72)
 	UI.place(loading, 0, 0, 1, 1, 0, 0, 0, 0)
 	ui_layer.add_child(loading)
-	var ll := UI.label("Charting the waterways...", 16, Color(1.0, 0.9, 0.6))
+	var ll := UI.label("Charting the waterways...", 18, Color(1.0, 0.9, 0.6))
 	ll.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ll.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	UI.place(ll, 0, 0, 1, 1, 0, 0, 0, 0)
@@ -101,25 +107,36 @@ func _ready() -> void:
 	on_player_tile_changed(world.tile_at_pos(player.position))
 	exploration.flush()
 	if data.is_empty():
-		message("Welcome to the waterways! Find the 100's of Kayaks store nearby (F to trade).")
-		message("E: board/leave kayak   R: carry it   Esc: controls")
+		message("Welcome to the waterways! The 100's of Kayaks store is right nearby.")
+		message("Your available actions are always shown at the bottom of the screen.")
 	else:
 		message("Welcome back, paddler.")
 
 
 func _build_world() -> void:
-	ground = WorldRenderer.new()
+	ground = TerrainRenderer.new()
 	add_child(ground)
-	ground.paint(world)
-	overlay = TileMapLayer.new()
-	overlay.tile_set = WorldRenderer.make_tileset()
-	add_child(overlay)
+	ground.build(world)
 	hint_layer = Node2D.new()
+	hint_layer.z_index = -15
 	hint_layer.draw.connect(_draw_hints)
 	add_child(hint_layer)
+	var decor_set: TileSet = DecorLayer.make_tileset()
+	flat_decor = DecorLayer.new()
+	add_child(flat_decor)
+	flat_decor.paint(world, false, decor_set)
 	entities = Node2D.new()
 	entities.y_sort_enabled = true
 	add_child(entities)
+	tall_decor = DecorLayer.new()
+	entities.add_child(tall_decor)
+	tall_decor.paint(world, true, decor_set)
+	for i in SPARKLE_POOL:
+		var sp: CPUParticles2D = FX.make_sparkles()
+		sp.emitting = false
+		sp.z_index = 5
+		add_child(sp)
+		sparkles.append(sp)
 	day_night = DayNight.new()
 	add_child(day_night)
 	day_night.night_started.connect(_on_night)
@@ -129,7 +146,7 @@ func _build_world() -> void:
 		s.store_index = i
 		s.tile = world.stores[i]
 		s.dock_tile = world.store_docks[i]
-		s.position = world.tile_center(s.tile) + Vector2(0, 6)
+		s.position = world.tile_center(s.tile) + Vector2(0, 12)
 		entities.add_child(s)
 		stores.append(s)
 		store_seen.append(false)
@@ -208,6 +225,8 @@ func _process(delta: float) -> void:
 		var dark: float = day_night.darkness()
 		for s in stores:
 			s.set_light(dark)
+		ground.set_daylight(clampf(1.0 - dark * 1.4, 0.0, 1.0))
+		_update_sparkles()
 	_hint_timer -= delta
 	if _hint_timer <= 0.0:
 		_hint_timer = 0.2
@@ -286,36 +305,74 @@ func try_interact() -> void:
 	message("Nothing to interact with here.")
 
 
-func context_hint() -> String:
-	var parts := PackedStringArray()
+## Every action the player can take right now, as [input_action, label].
+## Drives the on-screen action bar.
+func available_actions() -> Array:
+	var a: Array = []
 	var p = player
-	if _store_near(p.position) >= 0:
-		parts.append("F: Trade at 100's of Kayaks")
+	if p == null or p.dead:
+		return a
+	var near_store: bool = _store_near(p.position) >= 0
+	var near_camp: bool = camp != null and p.position.distance_to(camp.fire_position()) < CAMP_REACH
+	var can_shoot: bool = p.inventory.has("bow") and p.inventory.has("arrows")
 	if p.is_paddling():
-		parts.append("E: Get out")
-		if p.inventory.has("fishing_rod"):
-			parts.append("G: Fish")
+		a.append(["move", "Paddle"])
+		a.append(["sprint", "Power stroke"])
+		if p.can_land():
+			a.append(["board", "Get out"])
+		if p.fish_state == 1:
+			a.append(["fish", "Reel in"])
+		elif p.fish_state == 2:
+			a.append(["fish", "Hook it!"])
+		elif p.inventory.has("fishing_rod") and Tiles.is_water(world.tile_type_at_pos(p.position)):
+			a.append(["fish", "Fish"])
+		if can_shoot:
+			a.append(["shoot", "Shoot"])
 	elif p.is_carrying():
-		parts.append("E: Launch   R: Put down")
+		a.append(["move", "Walk"])
+		if p.can_launch():
+			a.append(["board", "Launch"])
+		a.append(["carry", "Put down"])
 	else:
+		a.append(["move", "Walk"])
+		a.append(["sprint", "Run"])
 		if p.near_kayak():
-			parts.append("E: Board   R: Carry kayak")
-		if camp != null and p.position.distance_to(camp.fire_position()) < CAMP_REACH:
-			if not camp.lit:
-				parts.append("F: Light fire (%d wood)   C: Pack camp" % CampScript.WOOD_TO_LIGHT)
-			else:
-				parts.append("F: Cook / Sleep   C: Pack camp")
+			a.append(["board", "Board"])
+			a.append(["carry", "Carry kayak"])
 		if p.inventory.has("shovel") and treasure_hint_near(p.position):
-			parts.append("Hold Space: Dig")
+			a.append(["use_tool", "Dig (hold)"])
 		elif p._forest_nearby():
-			parts.append("Hold Space: Chop wood")
-	return "    ".join(parts)
+			a.append(["use_tool", "Chop (hold)"])
+		if near_camp:
+			if not camp.lit:
+				a.append(["interact", "Light fire"])
+			elif p.inventory.has("meat_raw") or p.inventory.has("fish_raw"):
+				a.append(["interact", "Cook"])
+			elif day_night.is_evening():
+				a.append(["interact", "Sleep"])
+			a.append(["camp", "Pack camp"])
+		elif p.inventory.has("tent") or camp != null:
+			var tt: int = world.tile_type_at_pos(p.position)
+			if tt != Tiles.SHALLOW and tt != Tiles.MARSH:
+				a.append(["camp", "Make camp" if camp == null else "Move camp"])
+		if can_shoot:
+			a.append(["shoot", "Shoot"])
+	if near_store and not p.is_carrying():
+		a.append(["interact", "Trade"])
+	if p.hunger < 90.0:
+		for id in ItemDB.EAT_ORDER:
+			if p.inventory.has(id):
+				a.append(["eat", "Eat"])
+				break
+	a.append(["map", "Map"])
+	a.append(["inventory", "Pack"])
+	return a
 
 
 # ------------------------------------------------------------------ camp
 func toggle_camp() -> void:
 	if not player.is_paddling() and not player.is_carrying():
-		if camp != null and player.position.distance_to(camp.position) < CAMP_REACH + 6.0:
+		if camp != null and player.position.distance_to(camp.position) < CAMP_REACH + 12.0:
 			camp.queue_free()
 			camp = null
 			player.inventory.add("tent", 1)
@@ -460,7 +517,8 @@ func dig_at(pos: Vector2) -> void:
 		return
 	dug[found] = true
 	var tile := Vector2i(found % world.width, found / world.width)
-	overlay.set_cell(tile, 0, Tiles.HOLE_ATLAS)
+	hint_layer.queue_redraw()
+	FX.splash(entities, world.tile_center(tile), 6)
 	var loot: String = treasure_by_idx[found]
 	var bonus: int = randi_range(5, 25)
 	player.coins += bonus
@@ -473,11 +531,12 @@ func dig_at(pos: Vector2) -> void:
 
 func _chest_effect(at: Vector2) -> void:
 	var s := Sprite2D.new()
-	s.texture = Art.sprite(Art.CHEST)
-	s.position = at + Vector2(0, -6)
+	s.texture = Art.prop(Art.CHEST)
+	s.position = at + Vector2(0, -12)
+	s.z_index = 10
 	add_child(s)
 	var tw := s.create_tween()
-	tw.tween_property(s, "position:y", s.position.y - 14.0, 0.8)
+	tw.tween_property(s, "position:y", s.position.y - 28.0, 0.8)
 	tw.parallel().tween_property(s, "modulate:a", 0.0, 0.8).set_delay(0.6)
 	tw.tween_callback(s.queue_free)
 
@@ -486,18 +545,46 @@ func _draw_hints() -> void:
 	if player == null:
 		return
 	var pt: Vector2i = world.tile_at_pos(player.position)
-	var hint_tex: Texture2D = Art.sprite(Art.DIG_HINT)
-	var x_tex: Texture2D = Art.sprite(Art.X_MARK)
+	var hole_tex: Texture2D = Art.prop(Art.HOLE)
+	var x_tex: Texture2D = Art.prop(Art.X_MARK)
+	var pulse: float = 0.75 + 0.25 * sin(Time.get_ticks_msec() / 250.0)
+	for i in dug:
+		var tile := Vector2i(i % world.width, i / world.width)
+		if absi(tile.x - pt.x) < 30 and absi(tile.y - pt.y) < 20:
+			hint_layer.draw_texture(hole_tex, Vector2(tile * 32) - Vector2(16, 16))
+	for i in revealed_treasures:
+		if dug.has(i):
+			continue
+		var tile := Vector2i(i % world.width, i / world.width)
+		if absi(tile.x - pt.x) < 30 and absi(tile.y - pt.y) < 20:
+			hint_layer.draw_texture(x_tex, Vector2(tile * 32) - Vector2(16, 16), Color(1, 1, 1, pulse))
+
+
+## Points the sparkle emitters at the nearest undug treasure sites.
+func _update_sparkles() -> void:
+	if player == null:
+		return
+	var pt: Vector2i = world.tile_at_pos(player.position)
+	var near: Array = []
 	for i in treasure_by_idx:
 		if dug.has(i):
 			continue
 		var tile := Vector2i(i % world.width, i / world.width)
-		var d: int = absi(tile.x - pt.x) + absi(tile.y - pt.y)
-		var pos: Vector2 = Vector2(tile * 16)
-		if revealed_treasures.has(i) and d < 30:
-			hint_layer.draw_texture(x_tex, pos, Color(1, 1, 1, 0.8))
-		elif d <= 5:
-			hint_layer.draw_texture(hint_tex, pos, Color(1, 1, 1, clampf(1.0 - d / 6.0, 0.25, 1.0)))
+		var d: int = maxi(absi(tile.x - pt.x), absi(tile.y - pt.y))
+		if d <= SPARKLE_RANGE or (revealed_treasures.has(i) and d <= 20):
+			near.append([d, tile])
+	near.sort_custom(func(a, b): return a[0] < b[0])
+	for k in sparkles.size():
+		var sp: CPUParticles2D = sparkles[k]
+		if k < near.size():
+			var tile: Vector2i = near[k][1]
+			var d: int = near[k][0]
+			sp.position = world.tile_center(tile) + Vector2(0, -4)
+			sp.emitting = true
+			sp.modulate = Color(1, 1, 1, clampf(1.15 - float(d) / float(SPARKLE_RANGE + 1), 0.35, 1.0))
+		else:
+			sp.emitting = false
+	hint_layer.queue_redraw()
 
 
 func unrevealed_treasure_count() -> int:
@@ -531,7 +618,7 @@ func kayak_far_from_store(i: int) -> bool:
 	if player.is_paddling() or player.is_carrying():
 		return false
 	var dock: Vector2 = world.tile_center(world.store_docks[i])
-	return kayak.position.distance_to(dock) > 10.0 * 16.0
+	return kayak.position.distance_to(dock) > 10.0 * 32.0
 
 
 func retrieve_kayak_to_store(i: int) -> void:
@@ -571,7 +658,7 @@ func _respawn() -> void:
 	player.dead = false
 	var pos: Vector2 = respawn_point
 	if camp != null:
-		pos = camp.position + Vector2(0, 14)
+		pos = camp.position + Vector2(0, 28)
 	if not player.can_be_at(pos, false):
 		pos = player._find_spot(pos, false, false)
 	if not player.can_be_at(pos, false):
@@ -592,7 +679,7 @@ func save_game() -> bool:
 		"time": day_night.time_of_day,
 		"day": day_night.day,
 		"player": player.to_dict(),
-		"kayak": {"pos": [kayak.position.x, kayak.position.y], "rot": kayak.rotation, "state": kayak.state},
+		"kayak": {"pos": [kayak.position.x, kayak.position.y], "heading": kayak.heading, "state": kayak.state},
 		"camp": null,
 		"dug": dug.keys(),
 		"revealed": revealed_treasures.keys(),
@@ -613,7 +700,7 @@ func _apply_save(d: Dictionary) -> void:
 	var kd: Dictionary = d.get("kayak", {})
 	var kp: Array = kd.get("pos", [player.position.x, player.position.y])
 	kayak.position = Vector2(float(kp[0]), float(kp[1]))
-	kayak.rotation = float(kd.get("rot", 0.0))
+	kayak.heading = float(kd.get("heading", 0.0))
 	kayak.set_state(int(kd.get("state", KayakScript.State.PARKED)))
 	var cd = d.get("camp", null)
 	if cd is Dictionary:
@@ -622,7 +709,6 @@ func _apply_save(d: Dictionary) -> void:
 	for v in d.get("dug", []):
 		var idx: int = int(v)
 		dug[idx] = true
-		overlay.set_cell(Vector2i(idx % world.width, idx / world.width), 0, Tiles.HOLE_ATLAS)
 	for v in d.get("revealed", []):
 		revealed_treasures[int(v)] = true
 	exploration.from_base64(str(d.get("discovered", "")))

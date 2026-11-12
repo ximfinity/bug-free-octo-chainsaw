@@ -2,7 +2,7 @@ extends RefCounted
 ## The generated world: a tile grid plus points of interest.
 
 const Tiles = preload("res://scripts/world/tiles.gd")
-const TILE_SIZE := 16
+const TILE_SIZE := 32
 
 var width: int = 0
 var height: int = 0
@@ -10,6 +10,8 @@ var seed_value: int = 0
 var tiles: PackedByteArray = PackedByteArray()
 ## Per-tile river current direction (zero where there is no current).
 var flow: PackedVector2Array = PackedVector2Array()
+## Per-tile decor id + 1 (0 = none), see scripts/world/decor.gd.
+var decor: PackedByteArray = PackedByteArray()
 ## Vector2i tile positions of "100's of Kayaks" stores.
 var stores: Array = []
 ## Water tile next to each store where a retrieved kayak is dropped.
@@ -69,6 +71,12 @@ func flow_at_pos(p: Vector2) -> Vector2:
 	if not in_bounds(t.x, t.y):
 		return Vector2.ZERO
 	return flow[t.y * width + t.x]
+
+
+func get_decor(x: int, y: int) -> int:
+	if x < 0 or y < 0 or x >= width or y >= height or decor.is_empty():
+		return -1
+	return decor[y * width + x] - 1
 
 
 func pixel_size() -> Vector2:

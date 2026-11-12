@@ -7,6 +7,7 @@ extends RefCounted
 ## stores, start point and treasure placement.
 
 const Tiles = preload("res://scripts/world/tiles.gd")
+const Decor = preload("res://scripts/world/decor.gd")
 const WorldData = preload("res://scripts/world/world_data.gd")
 
 const LOOT_TABLE := [
@@ -40,11 +41,19 @@ static func generate(seed_value: int, w: int = 448, h: int = 448) -> WorldData:
 	mnoise.frequency = 0.02
 	mnoise.fractal_type = FastNoiseLite.FRACTAL_FBM
 	mnoise.fractal_octaves = 3
+	var tnoise := FastNoiseLite.new()
+	tnoise.seed = seed_value + 4242
+	tnoise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	tnoise.frequency = 0.008
+	tnoise.fractal_type = FastNoiseLite.FRACTAL_FBM
+	tnoise.fractal_octaves = 2
 
 	var elev := PackedFloat32Array()
 	elev.resize(n)
 	var moist := PackedFloat32Array()
 	moist.resize(n)
+	var temp := PackedFloat32Array()
+	temp.resize(n)
 	var border: float = maxf(12.0, w * 0.06)
 	var samples := PackedFloat32Array()
 	for y in h:
@@ -59,6 +68,7 @@ static func generate(seed_value: int, w: int = 448, h: int = 448) -> WorldData:
 				samples.append(e)
 			elev[i] = e
 			moist[i] = mnoise.get_noise_2d(x, y)
+			temp[i] = tnoise.get_noise_2d(x, y)
 	samples.sort()
 	var deep_q: float = _quantile(samples, 0.19)
 	var water_q: float = _quantile(samples, 0.31)
@@ -80,9 +90,14 @@ static func generate(seed_value: int, w: int = 448, h: int = 448) -> WorldData:
 		elif e < sand_q:
 			t = Tiles.SAND
 		elif e < hill_q:
-			t = Tiles.FOREST if moist[i] > 0.05 else Tiles.GRASS
+			t = _lowland_biome(moist[i], temp[i])
 		elif e < mount_q:
-			t = Tiles.HILL
+			if moist[i] > 0.25:
+				t = Tiles.FOREST
+			elif moist[i] < -0.15:
+				t = Tiles.ROCKY
+			else:
+				t = Tiles.HILL
 		elif e < snow_q:
 			t = Tiles.MOUNTAIN
 		else:
@@ -205,9 +220,9 @@ static func generate(seed_value: int, w: int = 448, h: int = 448) -> WorldData:
 				match t:
 					Tiles.DEEP, Tiles.SHALLOW:
 						cost = 1.0
-					Tiles.FOREST:
+					Tiles.FOREST, Tiles.BIRCH, Tiles.MAPLE:
 						cost = 4.0
-					Tiles.HILL:
+					Tiles.HILL, Tiles.ROCKY:
 						cost = 8.0
 					Tiles.MOUNTAIN:
 						cost = 30.0
@@ -277,7 +292,7 @@ static func generate(seed_value: int, w: int = 448, h: int = 448) -> WorldData:
 		for x in range(1, w - 1):
 			var i: int = y * w + x
 			var t: int = tiles[i]
-			if (t == Tiles.GRASS or t == Tiles.SAND) and moist[i] > 0.35:
+			if (t == Tiles.GRASS or t == Tiles.SAND or t == Tiles.MEADOW) and moist[i] > 0.35:
 				if lake_mask[tiles[i - 1]] == 1 or lake_mask[tiles[i + 1]] == 1 \
 						or lake_mask[tiles[i - w]] == 1 or lake_mask[tiles[i + w]] == 1:
 					tiles[i] = Tiles.MARSH
@@ -317,7 +332,117 @@ static func generate(seed_value: int, w: int = 448, h: int = 448) -> WorldData:
 	wd.tiles = tiles
 	wd.flow = flow
 	_place_points_of_interest(wd, rng)
+	_place_decor(wd, moist)
 	return wd
+
+
+## Biome for the fertile lowland band, from moisture and temperature.
+static func _lowland_biome(m: float, t: float) -> int:
+	if m > 0.05:
+		if t < -0.18:
+			return Tiles.FOREST
+		if t > 0.22:
+			return Tiles.MAPLE
+		return Tiles.BIRCH
+	if m < -0.3 and t > -0.1:
+		return Tiles.MEADOW
+	return Tiles.GRASS
+
+
+## Cheap deterministic per-tile random in [0, 1).
+static func hash01(x: int, y: int, s: int) -> float:
+	var hsh: int = (x * 73856093) ^ (y * 19349663) ^ (s * 83492791)
+	hsh = (hsh ^ (hsh >> 13)) * 1274126177
+	hsh = hsh ^ (hsh >> 16)
+	return float(hsh & 0xFFFF) / 65536.0
+
+
+## Plants, trees and rocks per biome, stored as id + 1 in wd.decor.
+static func _place_decor(wd: WorldData, moist: PackedFloat32Array) -> void:
+	var w: int = wd.width
+	var h: int = wd.height
+	var tiles: PackedByteArray = wd.tiles
+	var decor := PackedByteArray()
+	decor.resize(w * h)
+	decor.fill(0)
+	var s: int = wd.seed_value
+	for y in range(1, h - 1):
+		for x in range(1, w - 1):
+			var i: int = y * w + x
+			var r: float = hash01(x, y, s)
+			var v: int = 0 if hash01(x, y, s + 1) < 0.5 else 1
+			var d: int = -1
+			match tiles[i]:
+				Tiles.FOREST:
+					if r < 0.5: d = Decor.PINE0 + v
+					elif r < 0.54: d = Decor.STUMP
+					elif r < 0.60: d = Decor.FERN
+					elif r < 0.63: d = Decor.MUSHROOMS
+				Tiles.BIRCH:
+					if r < 0.40: d = Decor.BIRCH0 + v
+					elif r < 0.47: d = Decor.OAK0 + v
+					elif r < 0.53: d = Decor.FERN
+					elif r < 0.56: d = Decor.MUSHROOMS
+					elif r < 0.59: d = Decor.BERRYBUSH
+				Tiles.MAPLE:
+					if r < 0.42: d = Decor.MAPLE0 + v
+					elif r < 0.48: d = Decor.OAK0 + v
+					elif r < 0.52: d = Decor.MUSHROOMS
+					elif r < 0.56: d = Decor.BUSH
+				Tiles.GRASS:
+					if r < 0.05: d = Decor.OAK0 + v
+					elif r < 0.08: d = Decor.BUSH
+					elif r < 0.10: d = Decor.BERRYBUSH
+					elif r < 0.16: d = Decor.TUFT
+					elif r < 0.20: d = Decor.FLOWERS_Y + int(hash01(x, y, s + 2) * 4.0)
+					elif r < 0.21: d = Decor.ROCK
+				Tiles.MEADOW:
+					if r < 0.24: d = Decor.FLOWERS_Y + int(hash01(x, y, s + 2) * 4.0)
+					elif r < 0.30: d = Decor.TUFT
+					elif r < 0.31: d = Decor.OAK0 + v
+					elif r < 0.33: d = Decor.BERRYBUSH
+				Tiles.HILL:
+					if r < 0.04: d = Decor.PINE0 + v
+					elif r < 0.07: d = Decor.ROCK
+					elif r < 0.11: d = Decor.TUFT
+					elif r < 0.13: d = Decor.BOULDER
+				Tiles.ROCKY:
+					if r < 0.10: d = Decor.ROCK
+					elif r < 0.16: d = Decor.BOULDER
+					elif r < 0.18: d = Decor.SNAG
+					elif r < 0.21: d = Decor.TUFT
+					elif r < 0.23: d = Decor.SNOWPINE
+				Tiles.SAND:
+					if r < 0.03: d = Decor.DRIFTWOOD
+					elif r < 0.04: d = Decor.ROCK
+				Tiles.MARSH:
+					if r < 0.25: d = Decor.CATTAIL
+					elif r < 0.40: d = Decor.REEDS
+					elif r < 0.43: d = Decor.WILLOW
+				Tiles.SHALLOW:
+					var near_land: bool = Tiles.LAND[tiles[i - 1]] == 1 or Tiles.LAND[tiles[i + 1]] == 1 \
+							or Tiles.LAND[tiles[i - w]] == 1 or Tiles.LAND[tiles[i + w]] == 1
+					if near_land and r < 0.07: d = Decor.REEDS
+					elif moist[i] > 0.0 and r < 0.13: d = Decor.LILY
+					elif moist[i] > 0.0 and r < 0.15: d = Decor.LILYFLOWER
+			if d >= 0:
+				decor[i] = d + 1
+	# Keep points of interest clear.
+	var clear: Array = [wd.start, wd.start_water]
+	for st in wd.stores:
+		var sp: Vector2i = st
+		for dy in range(-2, 2):
+			for dx in range(-2, 3):
+				clear.append(sp + Vector2i(dx, dy))
+	for dk in wd.store_docks:
+		clear.append(dk)
+	for tr in wd.treasures:
+		clear.append(tr["pos"])
+	for c in clear:
+		var cp: Vector2i = c
+		if cp.x >= 0 and cp.y >= 0 and cp.x < w and cp.y < h:
+			decor[cp.y * w + cp.x] = 0
+	wd.decor = decor
 
 
 # --------------------------------------------------------------------------
@@ -510,7 +635,7 @@ static func _place_points_of_interest(wd: WorldData, rng: RandomNumberGenerator)
 	for y in range(2, h - 2):
 		for x in range(2, w - 2):
 			var t: int = tiles[y * w + x]
-			if t != Tiles.SAND and t != Tiles.GRASS and t != Tiles.FOREST:
+			if t != Tiles.SAND and t != Tiles.GRASS and t != Tiles.MEADOW and not Tiles.is_forest(t):
 				continue
 			for d in dirs:
 				var nt: int = tiles[(y + d.y) * w + (x + d.x)]
@@ -567,7 +692,7 @@ static func _place_points_of_interest(wd: WorldData, rng: RandomNumberGenerator)
 		var x: int = rng.randi_range(4, w - 5)
 		var y: int = rng.randi_range(4, h - 5)
 		var t: int = tiles[y * w + x]
-		if t != Tiles.GRASS and t != Tiles.FOREST and t != Tiles.SAND and t != Tiles.HILL:
+		if not Tiles.is_diggable(t):
 			continue
 		var p := Vector2i(x, y)
 		if Vector2(p).distance_to(Vector2(wd.start)) < 12.0:

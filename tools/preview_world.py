@@ -17,16 +17,18 @@ import numpy as np
 from opensimplex import OpenSimplex
 from PIL import Image
 
-DEEP, SHALLOW, RIVER, SAND, GRASS, FOREST, HILL, MOUNTAIN, SNOW, MARSH, DOCK = range(11)
+DEEP, SHALLOW, RIVER, SAND, GRASS, FOREST, HILL, MOUNTAIN, SNOW, MARSH, DOCK, BIRCH, MAPLE, MEADOW, ROCKY = range(15)
 KAYAK_OK = {DEEP, SHALLOW, RIVER, MARSH}
-WALK_OK = {SHALLOW, SAND, GRASS, FOREST, HILL, MARSH, DOCK}
+WALK_OK = {SHALLOW, SAND, GRASS, FOREST, HILL, MARSH, DOCK, BIRCH, MAPLE, MEADOW, ROCKY}
 LAKE = {DEEP, SHALLOW}
 WATER = {DEEP, SHALLOW, RIVER}
-LAND = {SAND, GRASS, FOREST, HILL, MARSH, DOCK}
+LAND = {SAND, GRASS, FOREST, HILL, MARSH, DOCK, BIRCH, MAPLE, MEADOW, ROCKY}
+FORESTS = {FOREST, BIRCH, MAPLE}
 COLORS = {
     DEEP: (46, 86, 140), SHALLOW: (78, 140, 186), RIVER: (70, 128, 184), SAND: (226, 206, 150),
     GRASS: (120, 168, 90), FOREST: (70, 122, 66), HILL: (150, 160, 104), MOUNTAIN: (120, 110, 100),
     SNOW: (236, 236, 236), MARSH: (96, 142, 116), DOCK: (150, 106, 60),
+    BIRCH: (141, 201, 91), MAPLE: (227, 126, 59), MEADOW: (148, 213, 102), ROCKY: (169, 172, 148),
 }
 
 
@@ -142,6 +144,7 @@ def generate(seed, w, h):
     rng = np.random.default_rng(seed)
     e = fbm(OpenSimplex(seed), w, h, 0.016, 5) * 0.5 + 0.5
     moist = fbm(OpenSimplex(seed + 7919), w, h, 0.02, 3)
+    temp = fbm(OpenSimplex(seed + 4242), w, h, 0.008, 2)
     border = max(12.0, w * 0.06)
     yy, xx = np.mgrid[0:h, 0:w]
     d = np.minimum(np.minimum(xx, yy), np.minimum(w - 1 - xx, h - 1 - yy)).astype(float)
@@ -152,11 +155,17 @@ def generate(seed, w, h):
     deep_q, water_q, sand_q, hill_q, mount_q, snow_q = q(.19), q(.31), q(.36), q(.81), q(.89), q(.975)
     tiles = np.full((h, w), GRASS, dtype=np.int8)
     tiles[e >= sand_q] = GRASS
-    tiles[(e >= sand_q) & (e < hill_q) & (moist > 0.05)] = FOREST
+    low = (e >= sand_q) & (e < hill_q)
+    tiles[low & (moist > 0.05) & (temp < -0.18)] = FOREST
+    tiles[low & (moist > 0.05) & (temp >= -0.18) & (temp <= 0.22)] = BIRCH
+    tiles[low & (moist > 0.05) & (temp > 0.22)] = MAPLE
+    tiles[low & (moist < -0.3) & (temp > -0.1)] = MEADOW
     tiles[e < sand_q] = SAND
     tiles[e < water_q] = SHALLOW
     tiles[e < deep_q] = DEEP
     tiles[(e >= hill_q) & (e < mount_q)] = HILL
+    tiles[(e >= hill_q) & (e < mount_q) & (moist > 0.25)] = FOREST
+    tiles[(e >= hill_q) & (e < mount_q) & (moist < -0.15)] = ROCKY
     tiles[(e >= mount_q) & (e < snow_q)] = MOUNTAIN
     tiles[e >= snow_q] = SNOW
 
@@ -197,8 +206,8 @@ def generate(seed, w, h):
     jit = fbm(OpenSimplex(seed + 31337), w, h, 0.05, 2) * 0.5 + 0.5
     base = np.full((h, w), 3.0)
     base[np.isin(tiles, list(LAKE))] = 1.0
-    base[tiles == FOREST] = 4.0
-    base[tiles == HILL] = 8.0
+    base[np.isin(tiles, list(FORESTS))] = 4.0
+    base[np.isin(tiles, [HILL, ROCKY])] = 8.0
     base[tiles == MOUNTAIN] = 30.0
     base[tiles == SNOW] = 45.0
     cost = base + jit * 14.0
@@ -251,7 +260,7 @@ def generate(seed, w, h):
     nb[:-1, :] |= lake[1:, :]
     nb[:, 1:] |= lake[:, :-1]
     nb[:, :-1] |= lake[:, 1:]
-    tiles[np.isin(tiles, [GRASS, SAND]) & (moist > 0.35) & nb] = MARSH
+    tiles[np.isin(tiles, [GRASS, SAND, MEADOW]) & (moist > 0.35) & nb] = MARSH
     for fill in (SAND, GRASS):
         labels, sizes = label(tiles, KAYAK_OK)
         if sizes:
@@ -268,7 +277,7 @@ def place_pois(tiles, rng):
     shore, shore_water = [], []
     for y in range(2, h - 2):
         for x in range(2, w - 2):
-            if tiles[y, x] not in (SAND, GRASS, FOREST):
+            if tiles[y, x] not in (SAND, GRASS, MEADOW, FOREST, BIRCH, MAPLE):
                 continue
             for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
                 if tiles[y + dy, x + dx] in LAKE:
@@ -295,7 +304,7 @@ def place_pois(tiles, rng):
     while len(treasures) < 45 and tries < 30000:
         tries += 1
         x, y = int(rng.integers(4, w - 4)), int(rng.integers(4, h - 4))
-        if tiles[y, x] not in (GRASS, FOREST, SAND, HILL):
+        if tiles[y, x] not in (GRASS, FOREST, SAND, HILL, BIRCH, MAPLE, MEADOW, ROCKY):
             continue
         if np.hypot(x - start[0], y - start[1]) < 12:
             continue

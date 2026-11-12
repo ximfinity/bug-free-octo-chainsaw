@@ -26,7 +26,7 @@ func _ready() -> void:
 	coins_label = UI.label("", 10, Color(1.0, 0.88, 0.4))
 	content.add_child(coins_label)
 	tabs = TabContainer.new()
-	tabs.custom_minimum_size = Vector2(440, 200)
+	tabs.custom_minimum_size = Vector2(880, 400)
 	content.add_child(tabs)
 	sell_list = _tab("Sell")
 	buy_list = _tab("Buy")
@@ -65,7 +65,7 @@ func _row(icon_index: int, text: String) -> HBoxContainer:
 	if icon_index >= 0:
 		row.add_child(UI.icon(icon_index, 16))
 	var l := UI.label(text, 10)
-	l.custom_minimum_size = Vector2(230, 0)
+	l.custom_minimum_size = Vector2(500, 0)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	row.add_child(l)
 	return row
@@ -178,7 +178,7 @@ func _upgrade(kind: String, level: int) -> void:
 
 func _build_services(p) -> void:
 	UI.clear_children(service_list)
-	var row := _row(28, "Treasure map - marks an undiscovered dig site on your map. %d coins" % ItemDB.TREASURE_MAP_COST)
+	var row := _row(13, "Treasure map - marks an undiscovered dig site on your map. %d coins" % ItemDB.TREASURE_MAP_COST)
 	var b := UI.button("Buy", _buy_map)
 	b.disabled = p.coins < ItemDB.TREASURE_MAP_COST or main.unrevealed_treasure_count() == 0
 	row.add_child(b)

@@ -11,14 +11,16 @@ const NIGHT_END := 5.5
 
 ## Colour keyframes: [hour, colour]
 const KEYS := [
-	[0.0, Color(0.16, 0.18, 0.34)],
-	[4.5, Color(0.18, 0.2, 0.38)],
-	[6.0, Color(0.9, 0.72, 0.68)],
-	[7.5, Color(1, 1, 1)],
-	[17.5, Color(1, 1, 1)],
-	[19.5, Color(1.0, 0.72, 0.55)],
-	[21.0, Color(0.2, 0.22, 0.4)],
-	[24.0, Color(0.16, 0.18, 0.34)],
+	[0.0, Color(0.30, 0.34, 0.62)],
+	[4.5, Color(0.32, 0.36, 0.64)],
+	[6.0, Color(1.0, 0.78, 0.78)],
+	[7.5, Color(1.0, 0.97, 0.92)],
+	[9.0, Color(1, 1, 1)],
+	[17.0, Color(1, 1, 1)],
+	[18.5, Color(1.0, 0.86, 0.64)],
+	[19.8, Color(0.98, 0.66, 0.56)],
+	[21.0, Color(0.36, 0.38, 0.66)],
+	[24.0, Color(0.30, 0.34, 0.62)],
 ]
 
 var time_of_day: float = 8.0
@@ -72,7 +74,7 @@ func is_evening() -> bool:
 ## 0 at noon, 1 in deep night (used for light strength).
 func darkness() -> float:
 	var c: Color = color_for(time_of_day)
-	return clampf(1.0 - (c.r + c.g + c.b) / 3.0, 0.0, 1.0) * 1.35
+	return clampf((1.0 - (c.r + c.g + c.b) / 3.0) * 1.9, 0.0, 1.0)
 
 
 func color_for(hour: float) -> Color:

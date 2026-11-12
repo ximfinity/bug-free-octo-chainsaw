@@ -90,29 +90,35 @@ func _setup_input() -> void:
 
 func _make_theme() -> Theme:
 	var t := Theme.new()
-	t.default_font_size = 10
+	t.default_font_size = 20
 	var panel := StyleBoxFlat.new()
 	panel.bg_color = Color(0.07, 0.09, 0.13, 0.92)
 	panel.border_color = Color(0.85, 0.72, 0.42)
-	panel.set_border_width_all(1)
-	panel.set_corner_radius_all(3)
-	panel.set_content_margin_all(6)
+	panel.bg_color = Color(0.13, 0.11, 0.17, 0.93)
+	panel.border_color = Color(1.0, 0.8, 0.45)
+	panel.set_border_width_all(2)
+	panel.set_corner_radius_all(8)
+	panel.set_content_margin_all(14)
+	panel.shadow_color = Color(0, 0, 0, 0.35)
+	panel.shadow_size = 6
 	t.set_stylebox("panel", "PanelContainer", panel)
 	t.set_stylebox("panel", "Panel", panel)
 	t.set_stylebox("panel", "TabContainer", panel)
 	var normal := StyleBoxFlat.new()
-	normal.bg_color = Color(0.18, 0.32, 0.45)
-	normal.border_color = Color(0.1, 0.18, 0.26)
-	normal.set_border_width_all(1)
-	normal.set_corner_radius_all(2)
-	normal.content_margin_left = 6
-	normal.content_margin_right = 6
-	normal.content_margin_top = 2
-	normal.content_margin_bottom = 2
+	normal.bg_color = Color(0.17, 0.56, 0.6)
+	normal.border_color = Color(0.09, 0.33, 0.37)
+	normal.set_border_width_all(2)
+	normal.border_width_bottom = 4
+	normal.set_corner_radius_all(6)
+	normal.content_margin_left = 12
+	normal.content_margin_right = 12
+	normal.content_margin_top = 4
+	normal.content_margin_bottom = 6
 	var hover := normal.duplicate() as StyleBoxFlat
-	hover.bg_color = Color(0.25, 0.45, 0.6)
+	hover.bg_color = Color(0.25, 0.68, 0.72)
 	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = Color(0.12, 0.22, 0.32)
+	pressed.bg_color = Color(0.12, 0.42, 0.46)
+	pressed.border_width_bottom = 2
 	var disabled := normal.duplicate() as StyleBoxFlat
 	disabled.bg_color = Color(0.2, 0.2, 0.22)
 	var focus := normal.duplicate() as StyleBoxFlat
@@ -126,9 +132,9 @@ func _make_theme() -> Theme:
 	t.set_color("font_color", "Button", Color(0.95, 0.95, 0.9))
 	t.set_color("font_disabled_color", "Button", Color(0.55, 0.55, 0.55))
 	t.set_color("font_color", "Label", Color(0.95, 0.93, 0.86))
-	t.set_constant("separation", "VBoxContainer", 3)
-	t.set_constant("separation", "HBoxContainer", 4)
-	t.set_font_size("font_size", "TabContainer", 10)
+	t.set_constant("separation", "VBoxContainer", 6)
+	t.set_constant("separation", "HBoxContainer", 8)
+	t.set_font_size("font_size", "TabContainer", 20)
 	return t
 
 

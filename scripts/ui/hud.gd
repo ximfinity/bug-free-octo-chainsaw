@@ -1,9 +1,11 @@
 extends Control
-## In-game HUD: stat bars, clock, coins, context hint, message feed, minimap.
+## In-game HUD: stat bars, clock, coins, status, message feed, minimap and the
+## on-screen action bar showing every action available right now.
 
 const UI = preload("res://scripts/ui/ui_util.gd")
 const Art = preload("res://scripts/art.gd")
 const Minimap = preload("res://scripts/ui/minimap.gd")
+const ActionBar = preload("res://scripts/ui/action_bar.gd")
 
 var main
 var bars: Control
@@ -11,9 +13,9 @@ var clock_label: Label
 var coin_label: Label
 var arrow_label: Label
 var status_label: Label
-var hint_label: Label
 var messages: VBoxContainer
 var minimap: Control
+var action_bar
 
 
 func _ready() -> void:
@@ -22,56 +24,53 @@ func _ready() -> void:
 	theme = GameState.ui_theme
 
 	bars = Control.new()
-	bars.position = Vector2(6, 6)
-	bars.custom_minimum_size = Vector2(110, 40)
-	bars.size = Vector2(110, 40)
+	bars.position = Vector2(14, 14)
+	bars.size = Vector2(260, 96)
 	bars.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bars.draw.connect(_draw_bars)
 	add_child(bars)
 
+	var top_panel := PanelContainer.new()
+	UI.place(top_panel, 0.5, 0.0, 0.5, 0.0, -230, 10, 230, 58)
+	top_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(top_panel)
 	var top := HBoxContainer.new()
-	UI.place(top, 0.5, 0.0, 0.5, 0.0, -110, 4, 110, 20)
 	top.alignment = BoxContainer.ALIGNMENT_CENTER
 	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(top)
+	top_panel.add_child(top)
 	clock_label = UI.outlined("Day 1  08:00", 10)
 	top.add_child(clock_label)
-	top.add_child(UI.icon(Art.COIN, 12))
+	top.add_child(VSeparator.new())
+	top.add_child(UI.icon(Art.ICON_COIN, 11))
 	coin_label = UI.outlined("0", 10, Color(1.0, 0.88, 0.4))
 	top.add_child(coin_label)
-	var ai := UI.icon(22, 12)
-	top.add_child(ai)
+	top.add_child(UI.icon(Art.ICON_ARROWS, 11))
 	arrow_label = UI.outlined("0", 10)
 	top.add_child(arrow_label)
 
-	status_label = UI.outlined("", 9, Color(0.7, 0.85, 1.0))
-	status_label.position = Vector2(6, 48)
+	status_label = UI.outlined("", 9, Color(0.75, 0.88, 1.0))
+	status_label.position = Vector2(16, 114)
 	add_child(status_label)
 
-	hint_label = UI.outlined("", 9, Color(1.0, 0.95, 0.75))
-	UI.place(hint_label, 0.0, 1.0, 0.0, 1.0, 6, -18, 420, -4)
-	add_child(hint_label)
-
 	messages = VBoxContainer.new()
-	UI.place(messages, 0.5, 1.0, 0.5, 1.0, -160, -90, 160, -24)
+	UI.place(messages, 0.5, 1.0, 0.5, 1.0, -360, -260, 360, -110)
 	messages.alignment = BoxContainer.ALIGNMENT_END
 	messages.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	messages.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(messages)
 
 	minimap = Minimap.new()
-	UI.place(minimap, 1.0, 0.0, 1.0, 0.0, -110, 6, -6, 110)
+	UI.place(minimap, 1.0, 0.0, 1.0, 0.0, -226, 14, -14, 226)
 	add_child(minimap)
 
-	var help := UI.outlined("M map   Tab bag   Esc menu", 8, Color(0.85, 0.85, 0.85))
-	UI.place(help, 1.0, 0.0, 1.0, 0.0, -112, 112, -4, 124)
-	help.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	add_child(help)
+	action_bar = ActionBar.new()
+	add_child(action_bar)
 
 
 func setup(main_node) -> void:
 	main = main_node
 	minimap.main = main_node
+	action_bar.main = main_node
 
 
 func _process(_delta: float) -> void:
@@ -83,7 +82,7 @@ func _process(_delta: float) -> void:
 	arrow_label.text = str(p.inventory.count("arrows"))
 	var status := ""
 	if p.cold:
-		status = "Freezing! Light a campfire (C)."
+		status = "Freezing! Light a campfire."
 	elif main.day_night.is_night() and not main.is_in_safe_zone(p.position):
 		status = "It's dark and cold..."
 	elif main.day_night.is_evening() and not main.day_night.is_night():
@@ -91,7 +90,6 @@ func _process(_delta: float) -> void:
 	if p.hunger < 20.0:
 		status += ("  " if status != "" else "") + "Starving!"
 	status_label.text = status
-	hint_label.text = main.context_hint()
 	bars.queue_redraw()
 	minimap.queue_redraw()
 
@@ -100,17 +98,22 @@ func _draw_bars() -> void:
 	if main == null or main.player == null:
 		return
 	var p = main.player
-	_bar(0, "HP", p.health, Color(0.86, 0.22, 0.2))
-	_bar(13, "Food", p.hunger, Color(0.92, 0.58, 0.18))
-	_bar(26, "Stam", p.stamina, Color(0.3, 0.75, 0.35))
+	bars.draw_rect(Rect2(0, 0, 260, 96), Color(0.13, 0.11, 0.17, 0.75))
+	bars.draw_rect(Rect2(0, 0, 260, 96), Color(1.0, 0.8, 0.45, 0.9), false, 2.0)
+	_bar(10, "HP", p.health, Color(0.94, 0.33, 0.33))
+	_bar(38, "Food", p.hunger, Color(1.0, 0.65, 0.2))
+	_bar(66, "Stam", p.stamina, Color(0.4, 0.84, 0.42))
 
 
 func _bar(y: float, title: String, value: float, color: Color) -> void:
 	var font: Font = get_theme_default_font()
-	bars.draw_rect(Rect2(28, y, 80, 9), Color(0, 0, 0, 0.6))
-	bars.draw_rect(Rect2(29, y + 1, 78.0 * clampf(value / 100.0, 0.0, 1.0), 7), color)
-	bars.draw_string_outline(font, Vector2(0, y + 8), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, 3, Color.BLACK)
-	bars.draw_string(font, Vector2(0, y + 8), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color.WHITE)
+	var x0: float = 74.0
+	var w: float = 174.0
+	bars.draw_rect(Rect2(x0, y, w, 20), Color(0.1, 0.08, 0.13, 0.9))
+	bars.draw_rect(Rect2(x0 + 2, y + 2, (w - 4) * clampf(value / 100.0, 0.0, 1.0), 16), color)
+	bars.draw_rect(Rect2(x0 + 2, y + 2, (w - 4) * clampf(value / 100.0, 0.0, 1.0), 5), color.lightened(0.3))
+	bars.draw_string_outline(font, Vector2(10, y + 17), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, 5, Color(0.1, 0.08, 0.13))
+	bars.draw_string(font, Vector2(10, y + 17), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color.WHITE)
 
 
 func message(text: String) -> void:
@@ -119,7 +122,7 @@ func message(text: String) -> void:
 		var last := messages.get_child(messages.get_child_count() - 1) as Label
 		if last and last.text == text and last.modulate.a > 0.5:
 			return
-	var l := UI.outlined(text, 9)
+	var l := UI.outlined(text, 10)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	messages.add_child(l)
