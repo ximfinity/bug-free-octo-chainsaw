@@ -1,0 +1,164 @@
+# Paddle & Pine
+
+An open-world, top-down survival game about a kayaker exploring a procedurally
+generated wilderness of lakes, rivers and islands. Paddle the connected
+waterways, step ashore to hunt and forage, carry your kayak overland, make camp
+before the cold night sets in, trade at **100's of Kayaks** stores, upgrade your
+boat and paddle, and dig up buried treasure.
+
+Built with **Godot 4** (GDScript, GL Compatibility renderer). It exports to
+Windows, macOS, Linux and the Web, so it's ready for itch.io.
+
+## Features
+
+- **Procedural worlds from a seed.** Quantile-based terrain makes deep lakes,
+  shallows, sand, grass, forest, hills, impassable mountains and snow. An MST of
+  A*-carved rivers guarantees that every lake is reachable by water. Spur rivers
+  wind up into the hills, and currents push you downstream.
+- **Three ways to move.** Paddle (momentum, power strokes, currents, marsh drag),
+  walk (wade through shallows, slow in forest and hills) or carry the kayak
+  overland to the next waterway.
+- **Survival.** Health, hunger and stamina. Nights are cold and bring wolves, so
+  pitch your tent and light a fire (3 firewood). Sleep by the fire to skip to dawn
+  and save.
+- **Hunting and gathering.** Shoot rabbits, deer and ducks with the bow, catch fish
+  from the kayak, chop firewood (and find berries), and cook raw food at the fire.
+- **100's of Kayaks stores.** Sell hides, food and treasure. Buy arrows, food, a
+  shovel and a fishing rod. Upgrade the hull (speed and storage) and the paddle
+  (acceleration and stamina). Buy treasure maps, or pay for the kayak shuttle when
+  your boat is stranded far away.
+- **Exploration map.** Fog of war reveals as you travel, further from the water
+  and from hilltops. It has a minimap plus a zoomable full map (M) marking stores,
+  your kayak, your camp and treasure X's.
+- **Treasure.** 45 buried caches per world. Watch for disturbed soil when you're
+  close, or buy a map, then dig with a shovel.
+- **Saving.** JSON saves in `user://`. The world itself is regenerated from the
+  seed.
+- **Input.** Keyboard and mouse or a gamepad.
+
+## Controls
+
+| Action | Keyboard / mouse | Gamepad |
+|---|---|---|
+| Move / paddle | WASD or arrow keys | Left stick |
+| Sprint / power stroke | Shift | L3 |
+| Get in / out of the kayak (launch while carrying) | E | X |
+| Pick up / put down the kayak | R | Y |
+| Shoot bow | Left click (aims at the mouse) or X | RB |
+| Chop / dig (hold) | Space | B |
+| Fish (press again on the "!") | G | LB |
+| Pitch / pack up camp | C | D-pad down |
+| Interact: trade, light fire, cook, sleep | F | A |
+| Eat | Q | D-pad up |
+| Pack and crafting | Tab / I | D-pad right |
+| Map | M | Back |
+| Menu | Esc | Start |
+
+## Running it
+
+1. Install [Godot 4.4 or newer](https://godotengine.org/download) (the target is 4.7).
+2. Open Godot, choose **Import**, and select this folder's `project.godot`.
+3. Press **F5** to play.
+
+On first open, Godot imports the PNGs in `assets/`.
+
+## Tests
+
+```bash
+godot --headless --import
+```
+
+```bash
+godot --headless -s tests/run_tests.gd
+```
+
+```bash
+godot --headless res://tests/smoke_test.tscn
+```
+
+- The first command imports the assets (needed once).
+- `tests/run_tests.gd` generates many seeds and checks determinism, that all water
+  is one connected network, that stores and docks are reachable, and that treasure
+  is on walkable land. It also covers the inventory slot rules and the save format
+  of the exploration map.
+- `tests/smoke_test.tscn` boots the real game and plays through the core loop:
+  board, paddle, land, carry, camp, cook, sleep, the store, upgrades, a treasure
+  map, digging, shooting and saving.
+
+The GitHub Actions workflow (`.github/workflows/build.yml`) runs both test suites
+on every push and then exports Windows, Linux, macOS and Web builds as downloadable
+artifacts.
+
+### Previewing worlds without Godot
+
+`tools/preview_world.py` is a Python mirror of the generator. It uses different
+noise, so maps don't match the game's for the same seed, but the algorithm is
+identical. Use it to tune parameters and render a map PNG:
+
+```bash
+pip install numpy opensimplex pillow
+```
+
+```bash
+python3 tools/preview_world.py 42 320 world.png
+```
+
+## Publishing on itch.io
+
+1. Export from Godot (**Project → Export**, using the presets included) or download
+   the CI artifacts.
+2. Install [butler](https://itch.io/docs/butler/), then run `butler login`.
+3. Push each build to its own channel:
+
+```bash
+butler push build/windows yourname/paddle-and-pine:windows
+```
+
+```bash
+butler push build/linux yourname/paddle-and-pine:linux
+```
+
+```bash
+butler push build/macos yourname/paddle-and-pine:mac
+```
+
+```bash
+butler push build/web yourname/paddle-and-pine:html5
+```
+
+For the HTML5 channel, tick "This file will be played in the browser" on itch.io.
+The Web preset is single-threaded, so it works without SharedArrayBuffer headers.
+
+## Art
+
+All art is original, generated by `tools/gen_art.py` (run `python3 tools/gen_art.py`
+to regenerate it). Everything sits in fixed-grid atlases, so you can swap in a
+CC0 pack such as [Kenney](https://kenney.nl/assets) by redrawing the same cells:
+
+- `assets/tiles.png`: 16×16 terrain tiles. The layout is in `scripts/world/tiles.gd` (`ATLAS`).
+- `assets/sprites.png`: characters, animals, props and item icons. The indices are in `scripts/art.gd`.
+- `assets/kayak.png`: 32×16 kayak frames. Rows are hull tiers; columns are empty, stroke L and stroke R.
+- `assets/store.png`: the 32×32 "100's of Kayaks" building.
+
+## Project layout
+
+```
+autoload/game_state.gd        input map, UI theme, settings, save files
+scenes/                       title.tscn, main.tscn (nodes are built in code)
+scripts/world/                tiles, world_data, world_gen (generator), world_renderer
+scripts/player/player.gd      walking / paddling / carrying state machine, survival, tools
+scripts/entities/             kayak, store, camp, animal, arrow, pickup
+scripts/systems/              day_night, exploration (fog of war), inventory, animal_spawner
+scripts/ui/                   hud, minimap, map, inventory, store, pause menu
+scripts/data/item_db.gd       items, store stock, hull & paddle upgrades (balance here)
+tests/                        headless unit + smoke tests
+tools/                        art generator, Python world preview
+```
+
+## Roadmap ideas
+
+- Sound effects and music
+- Key rebinding UI and a volume slider
+- Weather (wind and rain affecting paddling), rapids and waterfalls
+- More biomes and animals (bears, beavers), and a fishing minigame
+- Kayak durability and repair, plus more craftables

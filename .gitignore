@@ -1,0 +1,9 @@
+# Godot
+.godot/
+*.translation
+export/
+build/
+# OS
+.DS_Store
+Thumbs.db
+__pycache__/

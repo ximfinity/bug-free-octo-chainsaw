@@ -1,0 +1,36 @@
+; Engine configuration file.
+; Open this folder with Godot 4.4+ (tested target: 4.7).
+
+config_version=5
+
+[application]
+
+config/name="Paddle & Pine"
+config/description="Open-world kayak survival: paddle connected waterways, hunt, camp, trade and dig for treasure."
+run/main_scene="res://scenes/title.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+config/icon="res://icon.png"
+
+[autoload]
+
+GameState="*res://autoload/game_state.gd"
+
+[display]
+
+window/size/viewport_width=640
+window/size/viewport_height=360
+window/size/window_width_override=1280
+window/size/window_height_override=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[gui]
+
+common/drop_mouse_on_gui_input_disabled=true
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/canvas_textures/default_texture_filter=0
+2d/snap/snap_2d_transforms_to_pixel=true
