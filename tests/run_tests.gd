@@ -8,6 +8,8 @@ const Tiles = preload("res://scripts/world/tiles.gd")
 const WorldGen = preload("res://scripts/world/world_gen.gd")
 const Inventory = preload("res://scripts/systems/inventory.gd")
 const Exploration = preload("res://scripts/systems/exploration.gd")
+const WorldEdits = preload("res://scripts/systems/world_edits.gd")
+const Decor = preload("res://scripts/world/decor.gd")
 
 var failures: int = 0
 var checks: int = 0
@@ -21,6 +23,7 @@ func _init() -> void:
 	test_world(8080, 448)
 	test_inventory()
 	test_exploration_roundtrip()
+	test_world_edits()
 	print("\n%d checks, %d failures (%d ms)" % [checks, failures, Time.get_ticks_msec() - t0])
 	quit(1 if failures > 0 else 0)
 
@@ -133,6 +136,34 @@ func test_inventory() -> void:
 	var inv2 = Inventory.new()
 	inv2.from_dict(d)
 	check(inv2.has("shovel"), "inventory dict round trip")
+
+
+func test_world_edits() -> void:
+	var w = WorldGen.generate(91, 160, 160)
+	var ed = WorldEdits.new()
+	ed.setup(w, null, null)
+	var t := Vector2i(50, 50)
+	ed.set_edit(t, "stump", 1.0, Decor.OAK0)
+	check(w.get_decor(t.x, t.y) == Decor.STUMP, "stump edit shows a stump")
+	ed.tick(2.6)
+	check(w.get_decor(t.x, t.y) == Decor.SAPLING, "stump becomes a sapling")
+	ed.tick(4.2)
+	check(w.get_decor(t.x, t.y) == Decor.OAK0 and ed.kind_at(t) == "", "sapling regrows into the original tree")
+	var f := Vector2i(60, 60)
+	ed.set_edit(f, "crop", 1.0, "pumpkin", 0)
+	ed.tick(1.5)
+	check(not ed.is_ripe(f), "pumpkin not ripe after half a day")
+	ed.tick(3.1)
+	check(ed.is_ripe(f), "pumpkin ripe after two days")
+	var d := Vector2i(70, 70)
+	ed.set_edit(d, "dug", 1.0)
+	var arr: Array = ed.to_array()
+	var ed2 = WorldEdits.new()
+	ed2.setup(w, null, null)
+	ed2.from_array(JSON.parse_string(JSON.stringify(arr)))
+	check(ed2.kind_at(d) == "dug" and ed2.kind_at(f) == "crop", "world edits survive a JSON round trip")
+	ed2.tick(2.2)
+	check(ed2.kind_at(d) == "", "dug ground grasses over")
 
 
 func test_exploration_roundtrip() -> void:

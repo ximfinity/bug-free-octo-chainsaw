@@ -27,15 +27,32 @@ func _process(delta: float) -> void:
 	if _t > LIFETIME:
 		queue_free()
 		return
-	if main == null or main.player == null:
+	if main == null or main.player == null or _t < 0.4:
 		return
-	if position.distance_to(main.player.position) < 28.0:
-		var added: int = main.player.inventory.add(item_id, amount)
+	var who = null
+	var best: float = 56.0
+	for c in main.party:
+		if c.downed or c.is_paddling():
+			continue
+		var d: float = position.distance_to(c.position)
+		if d < best:
+			best = d
+			who = c
+	if who == null:
+		return
+	if best > 22.0:
+		# Magnet: drift toward whoever is close.
+		if who.inventory.room_for(item_id) > 0:
+			position = position.move_toward(who.position, 200.0 * delta)
+		return
+	if true:
+		var added: int = who.inventory.add(item_id, amount)
 		if added > 0:
-			main.message("+%d %s" % [added, ItemDB.item_name(item_id)])
+			if who.controlled:
+				main.message("+%d %s" % [added, ItemDB.item_name(item_id)])
 			amount -= added
 		if amount <= 0:
 			queue_free()
-		elif _full_warned <= 0.0:
+		elif _full_warned <= 0.0 and who.controlled:
 			main.message("Inventory full! (upgrade your kayak hull for more room)")
 			_full_warned = 4.0

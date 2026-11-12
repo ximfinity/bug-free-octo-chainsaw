@@ -58,12 +58,24 @@ P = {
     "paddle": rgb("#3b3f4a"), "blade": rgb("#ffd23f"), "blade_d": rgb("#d9a514"),
     "eye": rgb("#2b2033"),
 }
+# Second character (Rowan): green vest, red cap, darker hair, denim.
+P2 = dict(P)
+P2.update({
+    "hair": rgb("#3a2618"), "skin": rgb("#d9a07a"), "skin_d": rgb("#b47a56"),
+    "hat": rgb("#e0453a"), "hat_d": rgb("#a82f27"), "hat_band": rgb("#ffffff"),
+    "pfd": rgb("#5cc05a"), "pfd_d": rgb("#3a8f3d"), "pfd_l": rgb("#9be488"),
+    "shirt": rgb("#f2e6c8"), "shirt_d": rgb("#cfc09a"),
+    "shorts": rgb("#4a6fa8"), "shorts_d": rgb("#34507d"),
+    "blade": rgb("#3fd0c9"), "blade_d": rgb("#22a19b"),
+})
+PAL = P  # palette used by draw_person / paddler (swapped per character)
+
 HULLS = [  # base, light, dark
     (rgb("#ffcc3d"), rgb("#ffe58a"), rgb("#d99a12")),
     (rgb("#ff5e57"), rgb("#ff9a8f"), rgb("#c8352f")),
     (rgb("#3fa7f0"), rgb("#8fd0ff"), rgb("#2370b8")),
 ]
-HULL_LEN = [44, 50, 56]
+HULL_LEN = [50, 54, 58]
 HULL_W = [7.0, 6.6, 6.2]
 
 
@@ -317,45 +329,53 @@ def draw_kayak(cv, cx, cy, heading, hull, with_paddler, stroke):
     # deck ridge
     cv.line(*tp(-L / 2 + 3, 0), *tp(L / 2 - 3, 0), shade(light, 1.05), 1.0)
     # bow / stern deck lines (bungees)
-    for bx in (L * 0.22, L * 0.30):
+    for bx in (L * 0.30, L * 0.37):
         cv.line(*tp(bx, -W * 0.5), *tp(bx + 2, W * 0.5), rgb("#2b2033"), 0.7)
-    cv.circle(*tp(-L * 0.30, 0), 2.2, dark)
-    # cockpit
-    cv.ellipse(*tp(-1.5, 0), 7.5, 4.6, rgb("#2b2033"), heading)
-    cv.ellipse(*tp(-1.5, 0), 6.3, 3.5, rgb("#3c3446"), heading)
-    if not with_paddler:
+    # two cockpits (tandem): front at +8, back at -10
+    for sx in (FRONT_X, BACK_X):
+        cv.ellipse(*tp(sx, 0), 6.4, 4.4, rgb("#2b2033"), heading)
+        cv.ellipse(*tp(sx, 0), 5.2, 3.3, rgb("#3c3446"), heading)
+    if with_paddler is None:
         return
-    # paddle: shaft roughly perpendicular to the hull, sweeping with the stroke
+    for seat_x, pal, stroke_shift in with_paddler:
+        draw_paddler(cv, tp, heading, seat_x, (stroke + stroke_shift) % 4, pal)
+
+
+FRONT_X = 8.0
+BACK_X = -10.0
+
+
+def draw_paddler(cv, tp, heading, seat_x, stroke, pal):
     sweep = [26, 8, -26, -8][stroke] * math.pi / 180
     shift = [2.0, -1.5, 2.0, -1.5][stroke]
     pa = heading + math.pi / 2 + sweep
-    pcx, pcy = tp(-1 + shift, 0)
-    half = 17
+    pcx, pcy = tp(seat_x + 0.5 + shift, 0)
+    half = 16
     ex, ey = math.cos(pa) * half, math.sin(pa) * half
     blade_side = 1 if stroke < 2 else -1  # which blade is in the water
-    cv.line(pcx - ex, pcy - ey, pcx + ex, pcy + ey, P["paddle"], 1.6)
+    cv.line(pcx - ex, pcy - ey, pcx + ex, pcy + ey, pal["paddle"], 1.6)
     for sgn in (-1, 1):
         bx, by = pcx + ex * sgn, pcy + ey * sgn
         dip = sgn == blade_side
         if dip:  # splash where the blade bites
             cv.ellipse(bx, by, 6.0, 3.6, rgb("#e8fbff"), pa)
-        cv.ellipse(bx, by, 5.2, 2.6, P["blade_d"] if dip else P["blade"], pa)
-    # paddler seen from above: wide shoulders in a bright vest, arms, sun hat
-    tx, ty = tp(-2.5, 0)
-    cv.ellipse(tx, ty, 4.2, 7.4, P["pfd_d"], heading)
-    cv.ellipse(*tp(-2.2, -0.6), 3.6, 6.6, P["pfd"], heading)
-    cv.ellipse(*tp(-1.0, -2.5), 1.6, 2.4, P["pfd_l"], heading)
+        cv.ellipse(bx, by, 5.0, 2.5, pal["blade_d"] if dip else pal["blade"], pa)
+    # paddler seen from above: shoulders in a bright vest, arms, hat
+    tx, ty = tp(seat_x - 1.0, 0)
+    cv.ellipse(tx, ty, 4.0, 7.0, pal["pfd_d"], heading)
+    cv.ellipse(*tp(seat_x - 0.7, -0.6), 3.4, 6.2, pal["pfd"], heading)
+    cv.ellipse(*tp(seat_x + 0.5, -2.4), 1.5, 2.2, pal["pfd_l"], heading)
     for sgn in (-1, 1):
         hx, hy = pcx + ex * sgn * 0.45, pcy + ey * sgn * 0.45
-        sx, sy = tp(-1.5, 5.6 * sgn)
-        cv.line(sx, sy, hx, hy, P["skin_d"], 2.2)
-        cv.circle(hx, hy, 1.5, P["skin"])
-    hx, hy = tp(-1.0, 0)
-    cv.ellipse(hx + 0.8, hy + 1.0, 4.4, 4.4, rgb("#2b2033"), heading)
-    cv.circle(hx, hy, 4.4, P["hat"])
-    cv.circle(hx - 0.2, hy - 0.2, 2.8, P["hat_band"])
-    cv.circle(hx - 0.3, hy - 0.3, 2.2, P["hat_d"])
-    cv.circle(hx - 1.0, hy - 1.0, 0.9, rgb("#f5dca3"))
+        sx, sy = tp(seat_x, 5.2 * sgn)
+        cv.line(sx, sy, hx, hy, pal["skin_d"], 2.0)
+        cv.circle(hx, hy, 1.4, pal["skin"])
+    hx, hy = tp(seat_x + 0.5, 0)
+    cv.ellipse(hx + 0.8, hy + 1.0, 4.2, 4.2, rgb("#2b2033"), heading)
+    cv.circle(hx, hy, 4.2, pal["hat"])
+    cv.circle(hx - 0.2, hy - 0.2, 2.7, pal["hat_band"])
+    cv.circle(hx - 0.3, hy - 0.3, 2.1, pal["hat_d"])
+    cv.circle(hx - 1.0, hy - 1.0, 0.9, rgb("#f5f0e0"))
 
 
 def kayak_shadow(heading, hull):
@@ -374,14 +394,30 @@ def kayak_shadow(heading, hull):
     return Image.fromarray(a, "RGBA")
 
 
+# Kayak columns: 0 empty | 1-4 Juniper solo (back seat) | 5-8 Rowan solo
+# (back seat) | 9-12 both (Rowan front, Juniper back, strokes offset).
+KAYAK_COLS = 13
+
+
+def kayak_riders(col):
+    if col == 0:
+        return None, 0
+    if col <= 4:
+        return [(BACK_X, P, 0)], col - 1
+    if col <= 8:
+        return [(BACK_X, P2, 0)], col - 5
+    return [(FRONT_X, P2, 2), (BACK_X, P, 0)], col - 9
+
+
 def make_kayak():
-    atlas = Image.new("RGBA", (5 * 64, 48 * 64), (0, 0, 0, 0))
+    atlas = Image.new("RGBA", (KAYAK_COLS * 64, 48 * 64), (0, 0, 0, 0))
     for hull in range(3):
         for h in range(16):
             heading = h * 2 * math.pi / 16
-            for col in range(5):
+            for col in range(KAYAK_COLS):
                 cv = Canvas(64, 64)
-                draw_kayak(cv, 32, 32, heading, hull, col > 0, max(0, col - 1))
+                riders, stroke = kayak_riders(col)
+                draw_kayak(cv, 32, 32, heading, hull, riders, stroke)
                 im = kayak_shadow(heading, hull)
                 im.alpha_composite(cv.finish(outline=True))
                 atlas.paste(im, (col * 64, (hull * 16 + h) * 64))
@@ -394,14 +430,14 @@ def draw_person(cv, view, frame, carry):
     step = [0, 1, 0, -1][frame] if not carry else [0, 1][frame % 2]
     bob = -0.6 if step != 0 else 0.0
     oy = bob
-    sk, skd = P["skin"], P["skin_d"]
+    sk, skd = PAL["skin"], PAL["skin_d"]
     if view in (0, 1):
         # legs
         for lx, s in ((12.5, step), (17.5, -step)):
             cv.rect(lx, 35 + oy, lx + 3, 44 - max(0, s) * 1.5 + oy, skd if view == 1 else sk)
-            cv.rect(lx - 0.5, 44 - max(0, s) * 1.5 + oy, lx + 3.5, 46 - max(0, s) * 1.5 + oy, P["sandal"])
-        cv.rect(11, 29 + oy, 21, 37 + oy, P["shorts"])
-        cv.rect(11, 35 + oy, 21, 37 + oy, P["shorts_d"])
+            cv.rect(lx - 0.5, 44 - max(0, s) * 1.5 + oy, lx + 3.5, 46 - max(0, s) * 1.5 + oy, PAL["sandal"])
+        cv.rect(11, 29 + oy, 21, 37 + oy, PAL["shorts"])
+        cv.rect(11, 35 + oy, 21, 37 + oy, PAL["shorts_d"])
         # arms
         if carry:
             for ax in (7.5, 21.5):
@@ -409,66 +445,71 @@ def draw_person(cv, view, frame, carry):
         else:
             for ax, s in ((7.5, -step), (21.5, step)):
                 cv.rect(ax, 19 + oy + s, ax + 3, 30 + oy + s, sk)
-                cv.rect(ax, 19 + oy + s, ax + 3, 22 + oy + s, P["shirt"])
+                cv.rect(ax, 19 + oy + s, ax + 3, 22 + oy + s, PAL["shirt"])
         # torso: shirt + vest
-        cv.rect(10, 18 + oy, 22, 31 + oy, P["shirt"])
-        cv.rect(11, 18 + oy, 21, 30 + oy, P["pfd"])
-        cv.rect(11, 26 + oy, 21, 30 + oy, P["pfd_d"])
+        cv.rect(10, 18 + oy, 22, 31 + oy, PAL["shirt"])
+        cv.rect(11, 18 + oy, 21, 30 + oy, PAL["pfd"])
+        cv.rect(11, 26 + oy, 21, 30 + oy, PAL["pfd_d"])
         if view == 0:
-            cv.rect(15.5, 19 + oy, 16.5, 29 + oy, P["pfd_d"])
-            cv.rect(12, 22 + oy, 15, 23 + oy, P["pfd_l"])
-            cv.rect(17, 22 + oy, 20, 23 + oy, P["pfd_l"])
+            cv.rect(15.5, 19 + oy, 16.5, 29 + oy, PAL["pfd_d"])
+            cv.rect(12, 22 + oy, 15, 23 + oy, PAL["pfd_l"])
+            cv.rect(17, 22 + oy, 20, 23 + oy, PAL["pfd_l"])
         else:
-            cv.rect(13, 20 + oy, 19, 25 + oy, P["pfd_l"])
+            cv.rect(13, 20 + oy, 19, 25 + oy, PAL["pfd_l"])
         # head
-        cv.circle(16, 13 + oy, 6, sk if view == 0 else P["hair"])
+        cv.circle(16, 13 + oy, 6, sk if view == 0 else PAL["hair"])
         if view == 0:
-            cv.rect(10.5, 9 + oy, 21.5, 11 + oy, P["hair"])
-            cv.rect(13, 13 + oy, 14.2, 15 + oy, P["eye"])
-            cv.rect(17.8, 13 + oy, 19, 15 + oy, P["eye"])
+            cv.rect(10.5, 9 + oy, 21.5, 11 + oy, PAL["hair"])
+            cv.rect(13, 13 + oy, 14.2, 15 + oy, PAL["eye"])
+            cv.rect(17.8, 13 + oy, 19, 15 + oy, PAL["eye"])
             cv.rect(12, 16 + oy, 13.5, 17 + oy, rgb("#f3a08a"))
             cv.rect(18.5, 16 + oy, 20, 17 + oy, rgb("#f3a08a"))
         # hat
-        cv.ellipse(16, 9 + oy, 10, 3.2, P["hat_d"])
-        cv.ellipse(16, 8.5 + oy, 9.5, 2.8, P["hat"])
-        cv.rect(11, 3 + oy, 21, 9 + oy, P["hat"])
-        cv.rect(11, 7 + oy, 21, 8.5 + oy, P["hat_band"])
+        cv.ellipse(16, 9 + oy, 10, 3.2, PAL["hat_d"])
+        cv.ellipse(16, 8.5 + oy, 9.5, 2.8, PAL["hat"])
+        cv.rect(11, 3 + oy, 21, 9 + oy, PAL["hat"])
+        cv.rect(11, 7 + oy, 21, 8.5 + oy, PAL["hat_band"])
         cv.rect(12, 3 + oy, 15, 5 + oy, rgb("#f5dca3"))
     else:
         # side view, facing right
         back_leg, front_leg = step, -step
         for lx, s, col in ((14, back_leg, skd), (16, front_leg, sk)):
             cv.line(lx + 1.5, 35 + oy, lx + 1.5 + s * 2.5, 44 + oy, col, 3)
-            cv.rect(lx + s * 2.5, 44 + oy, lx + 4.5 + s * 2.5, 46 + oy, P["sandal"])
-        cv.rect(12, 29 + oy, 20, 37 + oy, P["shorts"])
-        cv.rect(12, 35 + oy, 20, 37 + oy, P["shorts_d"])
-        cv.rect(12, 18 + oy, 20, 31 + oy, P["shirt"])
-        cv.rect(12.5, 18 + oy, 20, 30 + oy, P["pfd"])
-        cv.rect(12.5, 26 + oy, 20, 30 + oy, P["pfd_d"])
-        cv.rect(18, 19 + oy, 19, 29 + oy, P["pfd_d"])
+            cv.rect(lx + s * 2.5, 44 + oy, lx + 4.5 + s * 2.5, 46 + oy, PAL["sandal"])
+        cv.rect(12, 29 + oy, 20, 37 + oy, PAL["shorts"])
+        cv.rect(12, 35 + oy, 20, 37 + oy, PAL["shorts_d"])
+        cv.rect(12, 18 + oy, 20, 31 + oy, PAL["shirt"])
+        cv.rect(12.5, 18 + oy, 20, 30 + oy, PAL["pfd"])
+        cv.rect(12.5, 26 + oy, 20, 30 + oy, PAL["pfd_d"])
+        cv.rect(18, 19 + oy, 19, 29 + oy, PAL["pfd_d"])
         if carry:
             cv.rect(15, 8 + oy, 18, 22 + oy, sk)
         else:
             cv.line(16, 20 + oy, 16 + step * 3, 29 + oy, sk, 3)
-            cv.rect(14.5, 19 + oy, 17.5, 22 + oy, P["shirt"])
+            cv.rect(14.5, 19 + oy, 17.5, 22 + oy, PAL["shirt"])
         cv.circle(16.5, 13 + oy, 6, sk)
-        cv.poly([(10.5, 9 + oy), (17, 9 + oy), (16, 15 + oy), (11, 17 + oy)], P["hair"])
-        cv.rect(19, 12.5 + oy, 20.2, 14.5 + oy, P["eye"])
+        cv.poly([(10.5, 9 + oy), (17, 9 + oy), (16, 15 + oy), (11, 17 + oy)], PAL["hair"])
+        cv.rect(19, 12.5 + oy, 20.2, 14.5 + oy, PAL["eye"])
         cv.rect(22, 13.5 + oy, 23.2, 15 + oy, skd)
-        cv.ellipse(17.5, 9 + oy, 11, 3.0, P["hat_d"])
-        cv.ellipse(17.5, 8.5 + oy, 10.5, 2.6, P["hat"])
-        cv.rect(12, 3 + oy, 21, 9 + oy, P["hat"])
-        cv.rect(12, 7 + oy, 21, 8.5 + oy, P["hat_band"])
+        cv.ellipse(17.5, 9 + oy, 11, 3.0, PAL["hat_d"])
+        cv.ellipse(17.5, 8.5 + oy, 10.5, 2.6, PAL["hat"])
+        cv.rect(12, 3 + oy, 21, 9 + oy, PAL["hat"])
+        cv.rect(12, 7 + oy, 21, 8.5 + oy, PAL["hat_band"])
 
 
 def make_player():
-    atlas = Image.new("RGBA", (6 * 32, 3 * 48), (0, 0, 0, 0))
-    for view in range(3):
-        for col in range(6):
-            cv = Canvas(32, 48)
-            draw_person(cv, view, col % 4 if col < 4 else col - 4, col >= 4)
-            im = cv.finish(outline=True, shadow=(16, 46, 8, 2.5))
-            atlas.paste(im, (col * 32, view * 48))
+    """Rows 0-2 Juniper (down/up/side), rows 3-5 Rowan."""
+    global PAL
+    atlas = Image.new("RGBA", (6 * 32, 6 * 48), (0, 0, 0, 0))
+    for who, pal in enumerate((P, P2)):
+        PAL = pal
+        for view in range(3):
+            for col in range(6):
+                cv = Canvas(32, 48)
+                draw_person(cv, view, col % 4 if col < 4 else col - 4, col >= 4)
+                im = cv.finish(outline=True, shadow=(16, 46, 8, 2.5))
+                atlas.paste(im, (col * 32, (who * 3 + view) * 48))
+    PAL = P
     atlas.save(OUT / "player.png")
 
 
@@ -532,7 +573,54 @@ def draw_creature(cv, kind, frame):
         cv.circle(36, 21, 1.0, rgb("#ffd23f"))
 
 
-CREATURE_ORDER = ["rabbit", "deer", "duck", "wolf"]
+def draw_danger(cv, kind, frame):
+    s = [0, 1][frame]
+    if kind == "spider":
+        body, body_d, mark = rgb("#3b2f4a"), rgb("#251c30"), rgb("#e0392b")
+        for side in (-1, 1):
+            for k in range(4):
+                ang = math.radians(-50 + k * 33) + (0.15 if (k + s) % 2 else -0.1)
+                bx, by = 24 + side * 4, 33
+                kx, ky = bx + side * math.cos(ang) * 9, by + math.sin(ang) * 6 - 4
+                ex, ey = kx + side * 5, ky + 7
+                cv.line(bx, by, kx, ky, body_d, 1.4)
+                cv.line(kx, ky, ex, ey, body_d, 1.2)
+        cv.ellipse(24, 37, 7.5, 6, body)
+        cv.ellipse(24, 37, 2.2, 3, mark)
+        cv.circle(24, 29, 4.5, body)
+        for ex in (22, 26):
+            cv.circle(ex, 28, 1.1, rgb("#ff5a4a"))
+    elif kind == "wildcat":
+        fur, fur_d, light = rgb("#c98a4a"), rgb("#9a6232"), rgb("#f2dcb8")
+        for lx, o in ((14, s), (17, -s), (29, -s), (32, s)):
+            cv.line(lx, 32, lx + o * 2, 42, fur_d, 2.6)
+        cv.line(10, 30, 5, 24 - s * 2, fur_d, 3)
+        cv.ellipse(22, 30, 11, 5.8, fur)
+        cv.ellipse(22, 33, 8, 2.4, light)
+        for k in range(4):
+            cv.line(16 + k * 4, 26, 17 + k * 4, 30, fur_d, 1.2)
+        cv.circle(34, 26, 5.2, fur)
+        cv.poly([(31, 22), (31.5, 15), (34.5, 21)], fur_d)
+        cv.poly([(35, 21), (37.5, 15), (38.5, 22)], fur)
+        cv.line(31.5, 15, 31.5, 13, rgb("#2b2033"), 0.8)
+        cv.line(37.5, 15, 37.5, 13, rgb("#2b2033"), 0.8)
+        cv.circle(36.5, 25.5, 1.1, rgb("#d6f05a"))
+        cv.ellipse(38.5, 28, 1.6, 1.1, rgb("#e8a0a0"))
+    elif kind == "bear":
+        fur, fur_d, fur_l = rgb("#6b4a33"), rgb("#4a3222"), rgb("#8f6848")
+        for lx, o in ((10, s), (15, -s), (31, -s), (36, s)):
+            cv.rect(lx - 2.5 + o, 32, lx + 2.5 + o, 44, fur_d)
+        cv.ellipse(23, 28, 16, 11, fur)
+        cv.ellipse(20, 23, 11, 5, fur_l)
+        cv.circle(39, 24, 7.5, fur)
+        cv.circle(36, 17.5, 2.6, fur_d)
+        cv.circle(42, 18, 2.6, fur_d)
+        cv.ellipse(44.5, 26.5, 3.2, 2.6, rgb("#c9a27a"))
+        cv.circle(46.5, 25.5, 1.2, rgb("#2b2033"))
+        cv.circle(40.5, 22.5, 1.1, rgb("#2b2033"))
+
+
+CREATURE_ORDER = ["rabbit", "deer", "duck", "wolf", "spider", "wildcat", "bear"]
 
 
 def make_creatures():
@@ -540,8 +628,11 @@ def make_creatures():
     for r, kind in enumerate(CREATURE_ORDER):
         for f in range(2):
             cv = Canvas(48, 48)
-            draw_creature(cv, kind, f)
-            sh = None if kind == "duck" else (24, 44, 11, 2.5)
+            if kind in ("spider", "wildcat", "bear"):
+                draw_danger(cv, kind, f)
+            else:
+                draw_creature(cv, kind, f)
+            sh = None if kind == "duck" else ((24, 44, 17, 3) if kind == "bear" else (24, 44, 11, 2.5))
             atlas.paste(cv.finish(True, sh), (f * 48, r * 48))
     atlas.save(OUT / "creatures.png")
 
@@ -712,6 +803,58 @@ def peak(cv, rnd, variant, snowy):
     cv.poly([(px + 1, top[1] + 2), top, (px + w * t, top[1] + cap), (px + w * t * 0.4, top[1] + cap * 0.8)], rgb("#cfdcf0"))
 
 
+def sapling(cv, rnd):
+    cv.line(FX, FY, FX, FY - 14, rgb("#7a4f2f"), 1.6)
+    for bx, by, r in ((-4, -14, 4), (4, -15, 4), (0, -19, 4.5)):
+        cv.circle(FX + bx, FY + by, r, rgb("#4fae4a"))
+    cv.circle(FX - 2, FY - 19, 2, rgb("#8ee05e"))
+
+
+def dug_patch(cv, rnd):
+    cv.ellipse(FX, FY - 8, 13, 9, rgb("#8a5a34"))
+    cv.ellipse(FX, FY - 7, 10, 6.5, rgb("#6b4428"))
+    for _ in range(6):
+        cv.circle(FX + rnd.uniform(-11, 11), FY - 8 + rnd.uniform(-7, 7), 1.4, rgb("#a8744a"))
+
+
+def plot(cv, rnd):
+    cv.rect(FX - 14, FY - 22, FX + 14, FY + 4, rgb("#7a4c2a"))
+    for k in range(4):
+        y = FY - 19 + k * 6.5
+        cv.rect(FX - 13, y, FX + 13, y + 3, rgb("#5e3920"))
+        cv.rect(FX - 13, y + 3, FX + 13, y + 4, rgb("#9a6a40"))
+
+
+def crop(cv, rnd, kind, stage):
+    plot(cv, rnd)
+    rows = [FY - 17, FY - 4]
+    cols = [FX - 7, FX + 7]
+    for cy in rows:
+        for cx in cols:
+            if stage == 0:
+                cv.circle(cx, cy, 1.6, rgb("#c9a06a"))
+                continue
+            leaf = rgb("#5cc05a")
+            if kind == "carrot":
+                h = [0, 4, 7, 9][stage]
+                for dx in (-2, 0, 2):
+                    cv.line(cx, cy, cx + dx, cy - h, leaf, 1.4)
+                if stage == 3:
+                    cv.poly([(cx - 2, cy - 1), (cx + 2, cy - 1), (cx, cy + 4)], rgb("#ff8a2a"))
+            elif kind == "potato":
+                r = [0, 2.5, 4, 5.5][stage]
+                cv.circle(cx, cy - r * 0.6, r, rgb("#4f9e48"))
+                cv.circle(cx - 1, cy - r, r * 0.5, rgb("#7fd468"))
+                if stage == 3:
+                    cv.circle(cx + 2, cy - r, 1.3, rgb("#ffffff"))
+            else:
+                r = [0, 2, 3.5, 4][stage]
+                cv.circle(cx, cy - 2, r, rgb("#4f9e48"))
+                if stage >= 2:
+                    pr = 2.5 if stage == 2 else 5
+                    cv.ellipse(cx + 1, cy + 1, pr, pr * 0.8, rgb("#ff9a2a") if stage == 3 else rgb("#c9d65a"))
+
+
 # name -> (drawer, tall).  tall decor is y-sorted with the player.
 DECOR = [
     ("pine0", lambda c, r: tree_pine(c, r), True),
@@ -747,7 +890,11 @@ DECOR = [
     ("peak2", lambda c, r: peak(c, r, 2, False), True),
     ("snowpeak0", lambda c, r: peak(c, r, 0, True), True),
     ("snowpeak1", lambda c, r: peak(c, r, 2, True), True),
-]
+    ("sapling", sapling, True),
+    ("dug", dug_patch, False),
+    ("plot", plot, False),
+] + [(f"{k}{st}", (lambda kk, ss: (lambda c, r: crop(c, r, kk, ss)))(k, st), False)
+     for k in ("carrot", "potato", "pumpkin") for st in range(4)]
 
 
 def make_decor():
@@ -772,6 +919,7 @@ def make_decor():
 def make_props():
     atlas = Image.new("RGBA", (8 * 64, 2 * 64), (0, 0, 0, 0))
     cells = []
+    # (cells 0..12; see scripts/art.gd)
     # 0 tent
     cv = Canvas(64, 64)
     cv.poly([(10, 46), (32, 14), (54, 46)], rgb("#c9481f"))
@@ -836,6 +984,24 @@ def make_props():
     cv.poly([(32, 18), (35, 29), (46, 32), (35, 35), (32, 46), (29, 35), (18, 32), (29, 29)], rgb("#fff6c2"))
     cv.circle(32, 32, 3, rgb("#ffffff"))
     cells.append(cv.finish(False))
+    # 10 swing arc (pointing right)
+    cv = Canvas(64, 64)
+    outer = [(32 + math.cos(a) * 24, 32 + math.sin(a) * 24) for a in [math.radians(d) for d in range(-70, 71, 10)]]
+    inner = [(32 + math.cos(a) * 15, 32 + math.sin(a) * 15) for a in [math.radians(d) for d in range(70, -71, -10)]]
+    cv.poly(outer + inner, rgb("#ffffff"))
+    cells.append(cv.finish(False))
+    # 11 red alert "!"
+    cv = Canvas(64, 64)
+    cv.rect(29, 14, 35, 34, rgb("#ff4a3a"))
+    cv.rect(29, 38, 35, 44, rgb("#ff4a3a"))
+    cells.append(cv.finish(True))
+    # 12 heart
+    cv = Canvas(64, 64)
+    cv.circle(26, 28, 7, rgb("#ff5e78"))
+    cv.circle(38, 28, 7, rgb("#ff5e78"))
+    cv.poly([(19.5, 31), (44.5, 31), (32, 45)], rgb("#ff5e78"))
+    cv.circle(24, 26, 2, rgb("#ffc2cf"))
+    cells.append(cv.finish(True))
     for i, c in enumerate(cells):
         atlas.paste(c, ((i % 8) * 64, (i // 8) * 64))
     atlas.save(OUT / "props.png")
@@ -948,9 +1114,73 @@ def make_items():
         cv.circle(15, 15, 9, rgb("#ffd23f"))
         cv.rect(14, 10, 16.5, 21, rgb("#d9a514"))
 
+    def seeds(cv, col):
+        cv.rect(8, 7, 24, 26, rgb("#e8d5a0"))
+        cv.rect(8, 7, 24, 10, rgb("#c9b07a"))
+        cv.circle(16, 18, 4.5, col)
+        for x, y in ((11, 23), (21, 23), (13, 13)):
+            cv.circle(x, y, 1.2, rgb("#8a6a3a"))
+
+    def carrot(cv):
+        cv.poly([(10, 10), (16, 8), (14, 28)], rgb("#ff8a2a"))
+        cv.line(13, 9, 9, 3, rgb("#5cc05a"), 1.6)
+        cv.line(13, 9, 15, 2, rgb("#5cc05a"), 1.6)
+        cv.line(13, 9, 19, 4, rgb("#5cc05a"), 1.6)
+
+    def potato(cv, baked):
+        c = rgb("#b07a3a") if baked else rgb("#d9b06a")
+        cv.ellipse(16, 17, 10, 7, c, 0.3)
+        for x, y in ((12, 15), (19, 19), (17, 13)):
+            cv.circle(x, y, 1, shade(c, 0.7))
+        if baked:
+            cv.ellipse(16, 15, 5, 2, rgb("#fff1a8"), 0.3)
+
+    def pumpkin(cv):
+        for dx in (-6, 0, 6):
+            cv.ellipse(16 + dx, 18, 6.5, 8, rgb("#ff9a2a") if dx == 0 else rgb("#e8782a"))
+        cv.rect(15, 6, 18, 11, rgb("#6b8a2a"))
+
+    def silk(cv):
+        cv.circle(16, 16, 9, rgb("#f2f2f8"))
+        for k in range(4):
+            cv.line(9, 10 + k * 4, 23, 12 + k * 4, rgb("#c9c9d9"), 0.8)
+
+    def pelt(cv, col, spots):
+        cv.poly([(5, 10), (11, 5), (21, 6), (27, 10), (26, 24), (16, 28), (6, 24)], col)
+        for x, y in ((11, 13), (17, 18), (13, 21), (21, 12)):
+            cv.circle(x, y, 1.6, spots)
+
+    def knife(cv):
+        cv.poly([(8, 24), (22, 6), (25, 8), (12, 26)], rgb("#c9ced8"))
+        cv.line(7, 25, 4, 29, rgb("#6b3f24"), 3.5)
+
+    def hatchet(cv):
+        cv.line(8, 28, 20, 6, rgb("#8a5428"), 2.2)
+        cv.poly([(16, 6), (26, 4), (27, 14), (19, 12)], rgb("#b8bec9"))
+
+    def worms(cv):
+        for k, col in enumerate((rgb("#e88a8a"), rgb("#d97070"))):
+            pts = [(6 + i * 2.5, 14 + k * 6 + math.sin(i * 1.3 + k) * 3) for i in range(9)]
+            for a, b in zip(pts, pts[1:]):
+                cv.line(*a, *b, col, 2.2)
+
+    def mushroom(cv):
+        cv.rect(14, 16, 18, 27, rgb("#f5ead6"))
+        cv.ellipse(16, 15, 10, 6.5, rgb("#c98a4a"))
+        cv.ellipse(13, 13, 3, 1.6, rgb("#e8b07a"))
+
+    def stone(cv):
+        cv.ellipse(16, 18, 9, 7, rgb("#8d8f86"))
+        cv.ellipse(14, 16, 4, 2.5, rgb("#c9c9bd"))
+
     for fn in (lambda c: meat(c, False), lambda c: meat(c, True), lambda c: fish(c, False),
                lambda c: fish(c, True), berries, trailmix, hide, wood, arrows, purse, compass, gem,
-               idol, tmap, shovel, bow, tent, rod, coin):
+               idol, tmap, shovel, bow, tent, rod, coin,
+               lambda c: seeds(c, rgb("#ff8a2a")), lambda c: seeds(c, rgb("#d9b06a")),
+               lambda c: seeds(c, rgb("#e8782a")), carrot, lambda c: potato(c, False),
+               lambda c: potato(c, True), pumpkin, silk,
+               lambda c: pelt(c, rgb("#c98a4a"), rgb("#7a4a22")),
+               lambda c: pelt(c, rgb("#6b4a33"), rgb("#8f6848")), knife, hatchet, worms, stone, mushroom):
         icon(fn)
     atlas = Image.new("RGBA", (8 * 32, ((len(icons) + 7) // 8) * 32), (0, 0, 0, 0))
     for i, c in enumerate(icons):

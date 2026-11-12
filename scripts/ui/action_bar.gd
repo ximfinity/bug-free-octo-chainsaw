@@ -10,6 +10,7 @@ const PAD_NAMES := {
 	JOY_BUTTON_A: "A", JOY_BUTTON_B: "B", JOY_BUTTON_X: "X", JOY_BUTTON_Y: "Y",
 	JOY_BUTTON_LEFT_SHOULDER: "LB", JOY_BUTTON_RIGHT_SHOULDER: "RB",
 	JOY_BUTTON_BACK: "Back", JOY_BUTTON_START: "Start", JOY_BUTTON_LEFT_STICK: "L3",
+	JOY_BUTTON_RIGHT_STICK: "R3",
 	JOY_BUTTON_DPAD_UP: "D-Up", JOY_BUTTON_DPAD_DOWN: "D-Down", JOY_BUTTON_DPAD_RIGHT: "D-Right",
 	JOY_BUTTON_DPAD_LEFT: "D-Left",
 }
@@ -115,6 +116,8 @@ func glyph_text(action: String) -> String:
 		return "L-Stick" if use_pad else "WASD"
 	if action == "shoot" and use_pad:
 		action = "shoot_key"
+	if action == "sprint" and use_pad:
+		return "RT"
 	if not InputMap.has_action(action):
 		return action
 	for ev in InputMap.action_get_events(action):
@@ -125,5 +128,5 @@ func glyph_text(action: String) -> String:
 			var code: int = k.physical_keycode if k.physical_keycode != 0 else k.keycode
 			return OS.get_keycode_string(code)
 		if not use_pad and ev is InputEventMouseButton:
-			return "Click"
+			return "L-Click" if (ev as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT else "R-Click"
 	return "?"

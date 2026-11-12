@@ -7,11 +7,12 @@ const CONTROLS := """WASD / Arrows / Left stick - move or paddle
 Shift - sprint / power strokes (uses stamina)
 E - get in / out of the kayak (or launch while carrying)
 R - pick up / put down the kayak
-Left click or X - shoot bow (needs arrows)
-Space (hold) - chop trees / dig with a shovel
+Left click - melee attack     Right click or X - shoot bow
+Space (hold) - chop, forage, till, plant, harvest, dig, revive
 G - fish from the kayak, press again on a bite (!)
+V - switch between Juniper and Rowan     T - call your partner over
 C - pitch / pack up camp      F - trade, light fire, cook, sleep
-Q - eat      Tab - pack & crafting      M - map      Esc - menu"""
+Q - eat      Tab - pack, crafting, give items      M - map      Esc - menu"""
 
 var main
 var content: VBoxContainer

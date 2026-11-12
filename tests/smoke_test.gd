@@ -5,6 +5,7 @@ extends Node
 ## Exits 0 on success, 1 on failure.
 
 const Tiles = preload("res://scripts/world/tiles.gd")
+const Decor = preload("res://scripts/world/decor.gd")
 
 var failures: int = 0
 var main
@@ -81,8 +82,8 @@ func _run() -> void:
 	check(main.exploration.discovered_count > 0, "exploration revealed tiles")
 
 	# Camp, light and cook.
+	_unseat_all()
 	p.position = w.tile_center(w.start)
-	p.mode = 0
 	p.inventory.add("wood", 6)
 	p.inventory.add("meat_raw", 2)
 	main.toggle_camp()
@@ -143,12 +144,150 @@ func _run() -> void:
 	check(p.inventory.count("arrows") == arrows - 1, "fired an arrow")
 	await frames(10)
 
+	# --- Phase B1: chopping, farming, pickups, party, combat ---
+	_unseat_all()
+	var now: float = main.game_days()
+	var tree_tile: Vector2i = _find_decor(w, p, func(d): return Decor.is_tree(d))
+	check(tree_tile.x >= 0, "found a tree to chop")
+	if tree_tile.x >= 0:
+		var tree_id: int = w.get_decor(tree_tile.x, tree_tile.y)
+		var wood_before: int = p.inventory.count("wood")
+		p.inventory.add("wood", 0)
+		p.perform_action("chop", tree_tile)
+		check(w.get_decor(tree_tile.x, tree_tile.y) == Decor.STUMP, "chopped tree leaves a stump")
+		check(p.inventory.count("wood") > wood_before or p.inventory.room_for("wood") == 0, "chopping gives firewood")
+		main.edits.tick(now + 1.6)
+		check(w.get_decor(tree_tile.x, tree_tile.y) == Decor.SAPLING, "stump regrows into a sapling")
+		main.edits.tick(now + 3.2)
+		check(w.get_decor(tree_tile.x, tree_tile.y) == tree_id, "sapling grows back into the tree")
+	# Hold-to-repeat targeting: stand next to a tree, Space target is chop.
+	var t2: Vector2i = _find_decor(w, p, func(d): return Decor.is_tree(d))
+	if t2.x >= 0:
+		var stand: Vector2i = t2 + Vector2i(-1, 0)
+		p.position = w.tile_center(stand)
+		p.facing = Vector2.RIGHT
+		var tgt: Dictionary = p.space_target()
+		check(not tgt.is_empty() and tgt["action"] == "chop", "facing a tree targets Chop")
+	# Farming: till, plant, grow, harvest.
+	var farm: Vector2i = _find_tile(w, p, func(x, y): return w.get_tile(x, y) == Tiles.GRASS and w.get_decor(x, y) == -1 and main.edits.kind_at(Vector2i(x, y)) == "")
+	check(farm.x >= 0, "found open grass to farm")
+	if farm.x >= 0:
+		p.inventory.add("shovel", 1)
+		p.inventory.add("carrot_seeds", 2)
+		check(p.action_for_tile(farm) == "till", "open grass with a shovel can be tilled")
+		p.perform_action("till", farm)
+		check(main.edits.kind_at(farm) == "plot", "tilling makes a plot")
+		check(p.action_for_tile(farm) == "plant", "plot with seeds can be planted")
+		p.perform_action("plant", farm)
+		check(main.edits.kind_at(farm) == "crop", "planting makes a crop")
+		main.edits.tick(main.game_days() + 1.2)
+		check(main.edits.is_ripe(farm), "crop ripens after growing")
+		var carrots: int = p.inventory.count("carrot")
+		p.perform_action("harvest", farm)
+		check(p.inventory.count("carrot") > carrots, "harvest gives carrots")
+	# Gradual eating.
+	p.hunger = 40.0
+	p.digesting = 0.0
+	p.inventory.add("trail_mix", 1)
+	p.eat("trail_mix")
+	check(p.hunger < 45.0 and p.digesting > 0.0, "food digests gradually instead of instantly")
+	await get_tree().create_timer(1.0).timeout
+	check(p.hunger > 42.0, "food meter rises over time (%.1f)" % p.hunger)
+	# Pickups collect by walking over them.
+	var stones: int = p.inventory.count("stone")
+	main.spawn_pickup("stone", 1, p.position + Vector2(10, 0))
+	await get_tree().create_timer(0.8).timeout
+	check(p.inventory.count("stone") > stones, "walking over a pickup collects it")
+	# Party: switch characters.
+	var juniper = main.party[0]
+	var rowan = main.party[1]
+	check(rowan != null and rowan.char_name == "Rowan", "second character exists")
+	main.switch_character()
+	check(main.player == rowan and rowan.controlled and not juniper.controlled, "switched to Rowan")
+	main.switch_character()
+	check(main.player == juniper, "switched back to Juniper")
+	# Tandem kayak: both board, Juniper leaves Rowan in the kayak.
+	main.kayak.position = w.tile_center(w.start_water)
+	juniper.position = w.tile_center(w.start)
+	rowan.position = w.tile_center(w.start)
+	juniper.try_board()
+	rowan._enter_kayak(main.kayak.position)
+	check(main.kayak.riders.size() == 2, "both characters fit in the kayak")
+	var land: Vector2 = juniper._find_spot(juniper.position, false, true)
+	if juniper.can_be_at(land, false):
+		juniper.exit_kayak(land)
+		check(not juniper.is_paddling() and rowan.is_paddling(), "Rowan stays in the kayak when Juniper gets out")
+	_unseat_all()
+	# Partner explores and forages near their anchor over time.
+	rowan.position = w.tile_center(w.start)
+	rowan.anchor = rowan.position
+	await get_tree().create_timer(2.5).timeout
+	check(rowan.position.distance_to(rowan.anchor) < 32.0 * 10, "idle partner stays near their anchor")
+	# Combat: melee kills a spider; a bear's hit hurts.
+	juniper.position = w.tile_center(w.start)
+	var Animal = load("res://scripts/entities/animal.gd")
+	var spider = Animal.new()
+	spider.kind = "spider"
+	spider.main = main
+	spider.position = juniper.position + Vector2(20, 0)
+	main.entities.add_child(spider)
+	await frames(2)
+	juniper.inventory.add("hatchet", 1)
+	juniper._attack_cd = 0.0
+	juniper.facing = Vector2.RIGHT
+	juniper.try_attack(false)
+	check(not spider.alive, "a hatchet swing kills a spider")
+	juniper.health = 100.0
+	var hp_before: float = juniper.health
+	juniper._invuln = 0.0
+	juniper.take_damage(30.0)
+	check(juniper.health < hp_before, "a bear-sized hit hurts")
+	# Downed + revive.
+	juniper.health = 100.0
+	rowan.position = juniper.position + Vector2(24, 0)
+	rowan._invuln = 0.0
+	rowan.take_damage(500.0)
+	check(rowan.downed, "partner can be knocked out")
+	juniper.facing = Vector2.RIGHT
+	var rt: Dictionary = juniper.space_target()
+	check(not rt.is_empty() and rt["action"] == "revive", "Space targets Revive next to a downed partner")
+	juniper.perform_action("revive", Vector2i.ZERO)
+	check(not rowan.downed and rowan.health > 0.0, "partner revived")
+
 	# Save and reload data round trip.
 	check(main.save_game(), "game saved")
 	var data: Dictionary = GameState.read_save()
 	check(int(data.get("seed", -1)) == 4242, "save has seed")
 	check((data.get("dug", []) as Array).size() == 1, "save has dug site")
+	check((data.get("party", []) as Array).size() == 2, "save has both characters")
+	check((data.get("edits", []) as Array).size() > 0, "save has world edits")
 	_finish()
+
+
+func _unseat_all() -> void:
+	for c in main.party:
+		if c.is_paddling():
+			main.kayak.remove_rider(c)
+			c.mode = 0
+	main.kayak.set_state(0)
+
+
+func _find_tile(w, p, pred: Callable) -> Vector2i:
+	var c: Vector2i = w.tile_at_pos(p.position)
+	for r in range(1, 40):
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				if absi(dx) != r and absi(dy) != r:
+					continue
+				var x: int = c.x + dx
+				var y: int = c.y + dy
+				if w.in_bounds(x, y) and pred.call(x, y):
+					return Vector2i(x, y)
+	return Vector2i(-1, -1)
+
+
+func _find_decor(w, p, pred: Callable) -> Vector2i:
+	return _find_tile(w, p, func(x, y): return pred.call(w.get_decor(x, y)) and w.is_walkable(x - 1, y))
 
 
 func _has_action(acts: Array, action: String) -> bool:

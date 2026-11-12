@@ -22,6 +22,9 @@ const HOLE := 6
 const BITE := 7
 const ARROW := 8
 const SPARKLE := 9
+const SWING := 10
+const ALERT := 11
+const HEART := 12
 
 # items.png (32x32 icons)
 const ICON_ARROWS := 8
@@ -32,7 +35,7 @@ const VIEW_DOWN := 0
 const VIEW_UP := 1
 const VIEW_SIDE := 2
 
-const CREATURE_ROWS := {"rabbit": 0, "deer": 1, "duck": 2, "wolf": 3}
+const CREATURE_ROWS := {"rabbit": 0, "deer": 1, "duck": 2, "wolf": 3, "spider": 4, "wildcat": 5, "bear": 6}
 const KAYAK_HEADINGS := 16
 
 static var _cache: Dictionary = {}
@@ -58,7 +61,19 @@ static func prop(index: int) -> AtlasTexture:
 	return _region(PROPS, "p%d" % index, Rect2((index % 8) * 64, (index / 8) * 64, 64, 64))
 
 
-## hull 0..2, heading_index 0..15 (0 = east, clockwise), col 0 empty, 1..4 strokes
+## Kayak column for who is aboard: riders = [juniper_aboard, rowan_aboard],
+## stroke 0..3. 0 = empty, 1-4 Juniper solo, 5-8 Rowan solo, 9-12 both.
+static func kayak_col(juniper: bool, rowan: bool, stroke: int) -> int:
+	if juniper and rowan:
+		return 9 + stroke
+	if juniper:
+		return 1 + stroke
+	if rowan:
+		return 5 + stroke
+	return 0
+
+
+## hull 0..2, heading_index 0..15 (0 = east, clockwise), col 0..12
 static func kayak_frame(hull: int, heading_index: int, col: int) -> AtlasTexture:
 	var row: int = hull * KAYAK_HEADINGS + posmod(heading_index, KAYAK_HEADINGS)
 	return _region(KAYAK, "k%d_%d" % [row, col], Rect2(col * 64, row * 64, 64, 64))
@@ -68,9 +83,11 @@ static func heading_index(angle: float) -> int:
 	return posmod(int(round(angle / (TAU / KAYAK_HEADINGS))), KAYAK_HEADINGS)
 
 
-## view 0 down / 1 up / 2 side(right); col 0..3 walk, 4..5 carry
-static func player_frame(view: int, col: int) -> AtlasTexture:
-	return _region(PLAYER, "pl%d_%d" % [view, col], Rect2(col * 32, view * 48, 32, 48))
+## who 0 Juniper / 1 Rowan; view 0 down / 1 up / 2 side(right);
+## col 0..3 walk, 4..5 carry
+static func player_frame(view: int, col: int, who: int = 0) -> AtlasTexture:
+	var row: int = who * 3 + view
+	return _region(PLAYER, "pl%d_%d" % [row, col], Rect2(col * 32, row * 48, 32, 48))
 
 
 static func creature_frame(kind: String, frame: int) -> AtlasTexture:

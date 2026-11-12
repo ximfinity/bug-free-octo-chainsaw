@@ -1,6 +1,7 @@
 extends Node2D
-## The player's kayak. Lives in the world when parked; follows the player
-## while paddled or carried. Uses 16 pre-rendered headings x 4 paddle strokes.
+## The two-person kayak. Lives in the world when parked (possibly with a
+## passenger sitting in it); follows whoever paddles or carries it.
+## 16 pre-rendered headings x rider combinations x 4 paddle strokes.
 
 const Art = preload("res://scripts/art.gd")
 const FX = preload("res://scripts/fx/fx.gd")
@@ -14,6 +15,8 @@ var heading: float = 0.0
 ## 0 = resting, otherwise 1..4 paddle stroke frame.
 var stroke_frame: int = 0
 var speed: float = 0.0
+## Characters currently seated (0..2).
+var riders: Array = []
 var sprite: Sprite2D
 var wake: CPUParticles2D
 var _t: float = 0.0
@@ -42,6 +45,29 @@ func set_hull(level: int) -> void:
 	refresh()
 
 
+func has_rider(c) -> bool:
+	return riders.has(c)
+
+
+func add_rider(c) -> void:
+	if not riders.has(c) and riders.size() < 2:
+		riders.append(c)
+	refresh()
+
+
+func remove_rider(c) -> void:
+	riders.erase(c)
+	refresh()
+
+
+## The rider currently being controlled, if any.
+func driver():
+	for c in riders:
+		if c.controlled:
+			return c
+	return null
+
+
 func set_state(s: int) -> void:
 	state = s
 	if state != State.OCCUPIED:
@@ -54,8 +80,15 @@ func refresh() -> void:
 	if sprite == null:
 		return
 	visible = state != State.CARRIED
-	var col: int = 0 if state == State.PARKED else maxi(1, stroke_frame)
-	sprite.texture = Art.kayak_frame(hull_level, Art.heading_index(heading), col)
+	var j := false
+	var r := false
+	for c in riders:
+		if c.who == 0:
+			j = true
+		else:
+			r = true
+	var stroke: int = 0 if state == State.PARKED else maxi(0, stroke_frame - 1)
+	sprite.texture = Art.kayak_frame(hull_level, Art.heading_index(heading), Art.kayak_col(j, r, stroke))
 
 
 func _process(delta: float) -> void:

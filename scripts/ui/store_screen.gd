@@ -171,7 +171,8 @@ func _upgrade(kind: String, level: int) -> void:
 		p.hull_level = level
 	else:
 		p.paddle_level = level
-	p.apply_upgrades()
+	for c in main.party:
+		c.apply_upgrades()
 	main.message("Upgraded to the %s!" % table[level]["name"])
 	refresh()
 

@@ -56,26 +56,39 @@ func interior(x: int, y: int, t: int, r: int) -> bool:
 	return true
 
 
+func _unseat_all() -> void:
+	for c in main.party:
+		if c.is_paddling():
+			main.kayak.remove_rider(c)
+			c.mode = 0
+	main.kayak.set_state(0)
+
+
 func walk_to(tile: Vector2i, face: Vector2 = Vector2.DOWN) -> void:
 	var p = main.player
-	if p.is_paddling():
-		p.kayak.set_state(0)
-	p.mode = 0
+	_unseat_all()
 	p.position = main.world.tile_center(tile)
 	p.facing = face
-	p.camera.reset_smoothing()
+	var other = main.partner_of(p)
+	other.position = main._beside(p.position)
+	other.anchor = other.position
+	other.facing = Vector2.LEFT
+	main.camera.position = p.position
+	main.camera.reset_smoothing()
 
 
-func paddle_at(tile: Vector2i, heading: float) -> void:
+func paddle_at(tile: Vector2i, heading: float, both: bool = true) -> void:
 	var p = main.player
-	p.mode = 0
-	p.kayak.set_state(0)
-	p.kayak.position = main.world.tile_center(tile)
-	p.kayak.heading = heading
+	_unseat_all()
+	main.kayak.position = main.world.tile_center(tile)
+	main.kayak.heading = heading
 	p.position = main.world.tile_center(tile)
 	p._enter_kayak(main.world.tile_center(tile))
 	p.heading = heading
-	p.camera.reset_smoothing()
+	if both:
+		main.partner_of(p)._enter_kayak(main.kayak.position)
+	main.camera.position = p.position
+	main.camera.reset_smoothing()
 
 
 func _run() -> void:
@@ -163,7 +176,8 @@ func _run() -> void:
 	main.toggle_camp()
 	main.day_night.set_time(22.5, false)
 	p.position += Vector2(0, 40)
-	p.camera.reset_smoothing()
+	main.camera.position = p.position
+	main.camera.reset_smoothing()
 	await frames(30)
 	await shot("09_night_camp")
 
@@ -180,6 +194,48 @@ func _run() -> void:
 		walk_to(mtn + Vector2i(4, 3), Vector2.UP)
 		await frames(20)
 		await shot("10b_mountains")
+
+	# 13. Chopping, farming and stumps.
+	var grove: Vector2i = find_tile(func(x, y): return interior(x, y, Tiles.BIRCH, 2) or interior(x, y, Tiles.MAPLE, 2))
+	if grove.x >= 0:
+		walk_to(grove, Vector2.RIGHT)
+		var now: float = main.game_days()
+		for dy in range(-2, 3):
+			for dx in range(-3, 4):
+				var t: Vector2i = grove + Vector2i(dx, dy)
+				var d: int = w.get_decor(t.x, t.y)
+				if Decor.is_tree(d) and (dx + dy) % 2 == 0:
+					main.edits.set_edit(t, "stump", now, d)
+		for k in 4:
+			var pt: Vector2i = grove + Vector2i(-3 + k, 3)
+			main.edits.set_edit(pt, "crop", now - 0.6 * k, ["carrot", "potato", "pumpkin", "carrot"][k], k)
+		main.edits.set_edit(grove + Vector2i(1, 3), "plot", now)
+		main.edits.set_edit(grove + Vector2i(2, 3), "dug", now)
+		await frames(20)
+		await shot("13_clearing_and_farm")
+
+	# 14. Danger: a bear and spiders nearby.
+	var forest: Vector2i = find_tile(func(x, y): return interior(x, y, Tiles.BIRCH, 1))
+	if forest.x < 0:
+		forest = grove
+	if forest.x >= 0:
+		walk_to(forest, Vector2.RIGHT)
+		for kind in ["bear", "spider", "spider", "wildcat"]:
+			var a = load("res://scripts/entities/animal.gd").new()
+			a.kind = kind
+			a.main = main
+			a.position = p.position + Vector2(randf_range(90, 220), randf_range(-90, 90))
+			main.entities.add_child(a)
+		await frames(40)
+		await shot("14_danger")
+
+	# 15. Two-person kayak.
+	paddle_at(near_shore, PI * 0.15, true)
+	Input.action_press("move_right")
+	await frames(30)
+	Input.action_release("move_right")
+	await frames(5)
+	await shot("15_tandem_kayak")
 
 	# 11. Map screen and store screen.
 	main.open_screen(main.map_screen)

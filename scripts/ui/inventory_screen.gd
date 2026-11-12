@@ -15,6 +15,7 @@ func _ready() -> void:
 	UI.place(self, 0, 0, 1, 1, 0, 0, 0, 0)
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	var m: Array = UI.modal("Pack", GameState.ui_theme)
+	m[1].get_child(0).name = "Title"
 	add_child(m[0])
 	content = m[1]
 	header = UI.label("", 9, Color(0.8, 0.85, 0.9))
@@ -42,6 +43,9 @@ func open() -> void:
 
 func refresh() -> void:
 	var p = main.player
+	var title := content.get_node_or_null("Title") as Label
+	if title:
+		title.text = "%s's Pack" % p.char_name
 	var hull: Dictionary = ItemDB.HULLS[p.hull_level]
 	var paddle: Dictionary = ItemDB.PADDLES[p.paddle_level]
 	header.text = "%s + %s    Slots %d/%d    Coins %d    Explored %.1f%%    Animals hunted %d    Treasure found %d" % [
@@ -65,6 +69,18 @@ func refresh() -> void:
 				refresh()))
 		elif bool(info.get("key", false)):
 			row.add_child(UI.label("tool", 8, Color(0.6, 0.7, 0.8)))
+		var other = main.partner_of(p)
+		if other != null and not other.downed and other.position.distance_to(p.position) < 80.0:
+			var give_id: String = id
+			row.add_child(UI.button("Give", func():
+				var n: int = 1 if ItemDB.is_key(give_id) else p.inventory.count(give_id)
+				var moved: int = other.inventory.add(give_id, n)
+				if moved > 0:
+					p.inventory.remove(give_id, moved)
+					main.message("Gave %d %s to %s." % [moved, ItemDB.item_name(give_id), other.char_name])
+				else:
+					main.message("%s has no room." % other.char_name)
+				refresh()))
 		list.add_child(row)
 
 	UI.clear_children(craft_box)

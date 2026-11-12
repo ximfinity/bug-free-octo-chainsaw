@@ -37,6 +37,9 @@ func _draw() -> void:
 			_cross(tp, origin, Color(0.9, 0.1, 0.1))
 	if main.kayak != null and not main.player.is_paddling() and not main.player.is_carrying():
 		_marker(main.kayak.position / TILE, origin, Color(1.0, 0.85, 0.2), 4.5)
+	var other = main.partner_of(main.player)
+	if other != null and not (other.is_paddling() and main.player.is_paddling()):
+		_marker(other.position / TILE, origin, Color(1.0, 0.45, 0.4) if other.downed else Color(0.45, 0.9, 0.45), 4.5)
 	_marker(pt, origin, Color.WHITE, 5.0)
 	draw_rect(Rect2(Vector2.ZERO, size), Color(1.0, 0.8, 0.45), false, 3.0)
 

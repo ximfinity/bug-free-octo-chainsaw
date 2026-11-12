@@ -16,6 +16,7 @@ var status_label: Label
 var messages: VBoxContainer
 var minimap: Control
 var action_bar
+var party_panel: Control
 
 
 func _ready() -> void:
@@ -66,6 +67,13 @@ func _ready() -> void:
 	action_bar = ActionBar.new()
 	add_child(action_bar)
 
+	party_panel = Control.new()
+	party_panel.position = Vector2(14, 150)
+	party_panel.size = Vector2(260, 60)
+	party_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	party_panel.draw.connect(_draw_party)
+	add_child(party_panel)
+
 
 func setup(main_node) -> void:
 	main = main_node
@@ -92,6 +100,7 @@ func _process(_delta: float) -> void:
 	status_label.text = status
 	bars.queue_redraw()
 	minimap.queue_redraw()
+	party_panel.queue_redraw()
 
 
 func _draw_bars() -> void:
@@ -101,19 +110,55 @@ func _draw_bars() -> void:
 	bars.draw_rect(Rect2(0, 0, 260, 96), Color(0.13, 0.11, 0.17, 0.75))
 	bars.draw_rect(Rect2(0, 0, 260, 96), Color(1.0, 0.8, 0.45, 0.9), false, 2.0)
 	_bar(10, "HP", p.health, Color(0.94, 0.33, 0.33))
-	_bar(38, "Food", p.hunger, Color(1.0, 0.65, 0.2))
+	_bar(38, "Food", p.hunger, Color(1.0, 0.65, 0.2), p.digesting)
 	_bar(66, "Stam", p.stamina, Color(0.4, 0.84, 0.42))
 
 
-func _bar(y: float, title: String, value: float, color: Color) -> void:
+func _bar(y: float, title: String, value: float, color: Color, pending: float = 0.0) -> void:
 	var font: Font = get_theme_default_font()
 	var x0: float = 74.0
 	var w: float = 174.0
 	bars.draw_rect(Rect2(x0, y, w, 20), Color(0.1, 0.08, 0.13, 0.9))
+	if pending > 0.0:
+		var f0: float = clampf(value / 100.0, 0.0, 1.0)
+		var f1: float = clampf((value + pending) / 100.0, 0.0, 1.0)
+		var a: float = 0.45 + 0.25 * sin(Time.get_ticks_msec() / 150.0)
+		bars.draw_rect(Rect2(x0 + 2 + (w - 4) * f0, y + 2, (w - 4) * (f1 - f0), 16), Color(color.lightened(0.5), a))
 	bars.draw_rect(Rect2(x0 + 2, y + 2, (w - 4) * clampf(value / 100.0, 0.0, 1.0), 16), color)
 	bars.draw_rect(Rect2(x0 + 2, y + 2, (w - 4) * clampf(value / 100.0, 0.0, 1.0), 5), color.lightened(0.3))
 	bars.draw_string_outline(font, Vector2(10, y + 17), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, 5, Color(0.1, 0.08, 0.13))
 	bars.draw_string(font, Vector2(10, y + 17), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color.WHITE)
+
+
+## Small card for each character: name, health, and what they're doing.
+func _draw_party() -> void:
+	if main == null or main.party.size() < 2:
+		return
+	var font: Font = get_theme_default_font()
+	for i in main.party.size():
+		var c = main.party[i]
+		var y: float = i * 30.0
+		var active: bool = c == main.player
+		party_panel.draw_rect(Rect2(0, y, 260, 26), Color(0.13, 0.11, 0.17, 0.85 if active else 0.6))
+		if active:
+			party_panel.draw_rect(Rect2(0, y, 260, 26), Color(1.0, 0.8, 0.45), false, 2.0)
+		var tex: Texture2D = Art.player_frame(0, 0, c.who)
+		party_panel.draw_texture_rect_region(tex, Rect2(4, y + 2, 22, 22), Rect2(5, 2, 22, 22))
+		var status: String = "you" if active else "idle"
+		if c.downed:
+			status = "KNOCKED OUT"
+		elif c.is_paddling():
+			status = "in kayak" if not active else "paddling"
+		elif not active and c.tool_action != "":
+			status = str(c.tool_action)
+		elif not active and c.ai.state == "walk":
+			status = "exploring"
+		party_panel.draw_string_outline(font, Vector2(32, y + 18), c.char_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, 4, Color(0.1, 0.08, 0.13))
+		party_panel.draw_string(font, Vector2(32, y + 18), c.char_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color.WHITE)
+		party_panel.draw_rect(Rect2(110, y + 8, 60, 10), Color(0.1, 0.08, 0.13))
+		party_panel.draw_rect(Rect2(111, y + 9, 58 * clampf(c.health / 100.0, 0.0, 1.0), 8), Color(0.94, 0.33, 0.33))
+		var sc: Color = Color(1.0, 0.45, 0.4) if c.downed else Color(0.8, 0.85, 0.9)
+		party_panel.draw_string(font, Vector2(178, y + 18), status, HORIZONTAL_ALIGNMENT_LEFT, 80, 13, sc)
 
 
 func message(text: String) -> void:

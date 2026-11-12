@@ -26,6 +26,8 @@ const KEYS := {
 	"inventory": [KEY_TAB, KEY_I],
 	"pause": [KEY_ESCAPE],
 	"shoot_key": [KEY_X],
+	"switch_character": [KEY_V],
+	"call_partner": [KEY_T],
 }
 const PAD_BUTTONS := {
 	"board": [JOY_BUTTON_X],
@@ -33,13 +35,15 @@ const PAD_BUTTONS := {
 	"interact": [JOY_BUTTON_A],
 	"use_tool": [JOY_BUTTON_B],
 	"fish": [JOY_BUTTON_LEFT_SHOULDER],
-	"shoot_key": [JOY_BUTTON_RIGHT_SHOULDER],
+	"shoot_key": [JOY_BUTTON_LEFT_STICK],
+	"attack": [JOY_BUTTON_RIGHT_SHOULDER],
+	"switch_character": [JOY_BUTTON_DPAD_LEFT],
+	"call_partner": [JOY_BUTTON_RIGHT_STICK],
 	"camp": [JOY_BUTTON_DPAD_DOWN],
 	"eat": [JOY_BUTTON_DPAD_UP],
 	"map": [JOY_BUTTON_BACK],
 	"inventory": [JOY_BUTTON_DPAD_RIGHT],
 	"pause": [JOY_BUTTON_START],
-	"sprint": [JOY_BUTTON_LEFT_STICK],
 }
 
 var new_game_seed: int = 0
@@ -71,11 +75,18 @@ func _setup_input() -> void:
 			var ev := InputEventJoypadButton.new()
 			ev.button_index = b
 			InputMap.action_add_event(action, ev)
-	if not InputMap.has_action("shoot"):
-		InputMap.add_action("shoot")
-	var mb := InputEventMouseButton.new()
-	mb.button_index = MOUSE_BUTTON_LEFT
-	InputMap.action_add_event("shoot", mb)
+	# Left click = melee, right click = bow (aims at the mouse).
+	for pair in [["attack", MOUSE_BUTTON_LEFT], ["shoot", MOUSE_BUTTON_RIGHT]]:
+		if not InputMap.has_action(pair[0]):
+			InputMap.add_action(pair[0])
+		var mb := InputEventMouseButton.new()
+		mb.button_index = pair[1]
+		InputMap.action_add_event(pair[0], mb)
+	# Sprint on the gamepad: right trigger.
+	var rt := InputEventJoypadMotion.new()
+	rt.axis = JOY_AXIS_TRIGGER_RIGHT
+	rt.axis_value = 1.0
+	InputMap.action_add_event("sprint", rt)
 	var axes := {
 		"move_left": [JOY_AXIS_LEFT_X, -1.0], "move_right": [JOY_AXIS_LEFT_X, 1.0],
 		"move_up": [JOY_AXIS_LEFT_Y, -1.0], "move_down": [JOY_AXIS_LEFT_Y, 1.0],

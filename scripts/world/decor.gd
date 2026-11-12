@@ -35,11 +35,15 @@ const PEAK1 := 29
 const PEAK2 := 30
 const SNOWPEAK0 := 31
 const SNOWPEAK1 := 32
-const COUNT := 33
-## Ids below FLAT_START are tall; FLAT_START..FLAT_END are flat ground cover;
-## ids after FLAT_END (mountain peaks) are tall again.
-const FLAT_START := 16
-const FLAT_END := 27
+const SAPLING := 33
+const DUG := 34
+const PLOT := 35
+## Crops: CROP0 + crop_index * 4 + stage (0 seeded .. 3 ripe)
+const CROP0 := 36
+const COUNT := 48
+## Flat (ground-cover) ids; everything else is tall and y-sorted.
+const FLAT := [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 34, 35, 36, 37, 38, 39, 40, 41,
+	42, 43, 44, 45, 46, 47]
 const COLUMNS := 8
 
 ## Trees you can chop for firewood.
@@ -47,7 +51,7 @@ const TREES := [PINE0, PINE1, BIRCH0, BIRCH1, MAPLE0, MAPLE1, OAK0, OAK1, WILLOW
 
 
 static func is_tall(id: int) -> bool:
-	return id >= 0 and id < COUNT and (id < FLAT_START or id > FLAT_END)
+	return id >= 0 and id < COUNT and not FLAT.has(id)
 
 
 static func is_tree(id: int) -> bool:

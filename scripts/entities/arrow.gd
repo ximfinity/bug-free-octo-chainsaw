@@ -8,6 +8,7 @@ const LIFETIME := 0.85
 
 var direction: Vector2 = Vector2.RIGHT
 var main
+var shooter = null
 var _t: float = 0.0
 
 
@@ -31,6 +32,6 @@ func _process(delta: float) -> void:
 		return
 	for a in get_tree().get_nodes_in_group("animals"):
 		if a.alive and a.position.distance_to(position + Vector2(0, 12)) < 20.0:
-			a.hit(1, direction)
+			a.hit(2 if a.kind == "bear" else 1, direction, 6.0, shooter)
 			queue_free()
 			return
