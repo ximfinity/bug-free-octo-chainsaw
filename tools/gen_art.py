@@ -1370,6 +1370,12 @@ def make_items():
         cv.rect(14, 3, 18, 5, rgb("#8a5428"))
         cv.rect(13, 15, 19, 22, rgb("#f2dcab"))
 
+    def trophy(cv, col, shine):
+        cv.poly([(5, 10), (11, 5), (21, 6), (27, 10), (26, 24), (16, 28), (6, 24)], col)
+        for x, y in ((11, 12), (20, 19), (14, 22)):
+            cv.circle(x, y, 1.3, shine)
+        cv.poly([(22, 4), (23.5, 8), (27, 9), (23.5, 10), (22, 14), (20.5, 10), (17, 9), (20.5, 8)], shine)
+
     def rabbit_foot(cv):
         cv.ellipse(16, 18, 6, 9, rgb("#f2e4d0"))
         cv.ellipse(16, 25, 5, 3, rgb("#e8d2b8"))
@@ -1391,7 +1397,10 @@ def make_items():
                lambda c: claw(c, rgb("#ffd23f"), 3), rabbit_foot,
                lambda c: antler(c, rgb("#e8d2a8"), False), fang, amber,
                lambda c: claw(c, rgb("#f4f1ea"), 2), lambda c: claw(c, rgb("#d9d2c6"), 3),
-               egg, gold_mushroom, arrowhead, old_coin, boot, bottle):
+               egg, gold_mushroom, arrowhead, old_coin, boot, bottle,
+               lambda c: trophy(c, rgb("#ff7ad9"), rgb("#7af0ff")),
+               lambda c: trophy(c, rgb("#c9d0dc"), rgb("#ffffff")),
+               lambda c: trophy(c, rgb("#ffcf3f"), rgb("#fff6c2"))):
         icon(fn)
     atlas = Image.new("RGBA", (8 * 32, ((len(icons) + 7) // 8) * 32), (0, 0, 0, 0))
     for i, c in enumerate(icons):

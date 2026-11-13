@@ -314,6 +314,33 @@ func _run() -> void:
 	# Rare spawner finds a valid spot.
 	var rare = main.spawner.try_spawn_rare("loon")
 	check(rare == null or rare.kind == "loon", "rare spawner places a loon on water")
+	# Colour variants: a golden rabbit is logged separately and drops a trophy.
+	var ItemDB2 = load("res://scripts/data/item_db.gd")
+	check(ItemDB2.roll_variant(1000.0) == 3, "huge luck always rolls a Golden variant")
+	var normals: int = 0
+	for k in 400:
+		if ItemDB2.roll_variant(1.0) == 0:
+			normals += 1
+	check(normals > 320, "most creatures are normal colour (%d / 400)" % normals)
+	var gold = Animal2.new()
+	gold.kind = "rabbit"
+	gold.variant = 3
+	gold.main = main
+	gold.position = j.position + Vector2(36, 0)
+	main.entities.add_child(gold)
+	var coins_v: int = main.coins
+	await frames(3)
+	check(int(main.journal["variants"].get("rabbit:3", 0)) >= 1, "golden rabbit logged as its own journal entry")
+	check(main.coins >= coins_v + 300, "first golden sighting pays a bonus")
+	check(gold.sprite.material != null, "golden variant uses the metallic shader")
+	gold.hit(10, Vector2.RIGHT)
+	await frames(2)
+	var trophy_found := false
+	for n in main.entities.get_children():
+		if n.get("item_id") == "golden_pelt":
+			trophy_found = true
+	check(trophy_found or j.inventory.has("golden_pelt"), "golden rabbit drops a Golden Pelt")
+
 	# Journal screen opens.
 	main.open_screen(main.journal_screen)
 	await frames(3)
@@ -328,6 +355,7 @@ func _run() -> void:
 	check((data.get("party", []) as Array).size() == 2, "save has both characters")
 	check((data.get("edits", []) as Array).size() > 0, "save has world edits")
 	check((data.get("journal", {}) as Dictionary).has("creatures"), "save has the creature journal")
+	check((data.get("journal", {}) as Dictionary).has("variants"), "save has journal variant entries")
 	_finish()
 
 

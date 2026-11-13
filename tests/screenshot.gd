@@ -261,8 +261,34 @@ func _run() -> void:
 	main.spawn_pickup("golden_trout", 1, p.position + Vector2(90, -30))
 	await frames(30)
 	await shot("16_rare_creatures")
+	# 16b. Colour variants: normal, shiny, silver and golden deer + rabbits.
+	await frames(5)
+	for n in main.entities.get_children():
+		if n.is_in_group("animals"):
+			n.queue_free()
+	walk_to(w.start, Vector2.DOWN)
+	for v in 4:
+		for kind in ["deer", "rabbit", "wolf"]:
+			var av = Animal3.new()
+			av.kind = kind
+			av.variant = v
+			av.main = main
+			var off := Vector2(-180 + v * 120, -110 + ["deer", "rabbit", "wolf"].find(kind) * 80)
+			var spot2: Vector2 = p.position + off
+			av.position = spot2
+			av.home = spot2
+			main.entities.add_child(av)
+			av.set_process(false)
+	main.day_night.set_time(11.0, false)
+	await frames(20)
+	await shot("16b_colour_variants")
+	for n in main.entities.get_children():
+		if n.is_in_group("animals"):
+			n.queue_free()
 	for kind in ["fox", "otter", "loon", "owl", "white_stag", "moose", "elder_bear"]:
 		main.journal["creatures"][kind] = 1
+	for vk in ["deer:0", "deer:1", "deer:2", "deer:3", "rabbit:0", "rabbit:1", "wolf:0", "wolf:2", "fox:0", "fox:3", "bear:0"]:
+		main.journal["variants"][vk] = 1
 	for id in ["rabbit_foot", "antler", "wolf_fang", "amber", "golden_trout", "white_antler", "gem"]:
 		main.journal["finds"][id] = 1
 	main.open_screen(main.journal_screen)

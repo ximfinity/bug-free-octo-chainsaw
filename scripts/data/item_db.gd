@@ -60,7 +60,28 @@ const ITEMS := {
 	"arrowhead": {"name": "Ancient Arrowhead", "icon": 50, "stack": 10, "price": 40, "rarity": 1},
 	"old_coin": {"name": "Old Silver Coin", "icon": 51, "stack": 10, "price": 75, "rarity": 2},
 	"old_boot": {"name": "Soggy Old Boot", "icon": 52, "stack": 5, "price": 1, "rarity": 0},
+	"shiny_tuft": {"name": "Shiny Tuft", "icon": 54, "stack": 10, "price": 80, "rarity": 2},
+	"silver_pelt": {"name": "Silver Pelt", "icon": 55, "stack": 5, "price": 220, "rarity": 3},
+	"golden_pelt": {"name": "Golden Pelt", "icon": 56, "stack": 5, "price": 550, "rarity": 4},
 }
+
+## Creature colour variants: 0 normal, 1 shiny, 2 silver, 3 gold.
+const VARIANT_NAMES := ["Normal", "Shiny", "Silver", "Golden"]
+const VARIANT_COLORS := [Color(0.95, 0.93, 0.86), Color(1.0, 0.48, 0.85), Color(0.82, 0.86, 0.93),
+	Color(1.0, 0.81, 0.25)]
+## Base odds (1 in N) before luck; checked rarest first.
+const VARIANT_ODDS := [0, 20, 60, 150]
+## Trophy dropped by a variant creature, and first-sighting bonus coins.
+const VARIANT_TROPHY := ["", "shiny_tuft", "silver_pelt", "golden_pelt"]
+const VARIANT_REWARD := [0, 40, 120, 300]
+
+
+## Rolls a colour variant. luck multiplies the odds (2.0 = twice as likely).
+static func roll_variant(luck: float = 1.0) -> int:
+	for v in [3, 2, 1]:
+		if randf() < luck / float(VARIANT_ODDS[v]):
+			return v
+	return 0
 
 ## Rarity tiers: name and colour (used for item names, pickup sparkles).
 const RARITY_NAMES := ["Common", "Uncommon", "Rare", "Epic", "Legendary"]

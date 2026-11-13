@@ -67,7 +67,7 @@ var dug: Dictionary = {}
 var revealed_treasures: Dictionary = {}
 var stats: Dictionary = {"kills": 0, "treasures": 0}
 ## Creature Journal: kind -> times sighted; rare item id -> times found.
-var journal: Dictionary = {"creatures": {}, "finds": {}}
+var journal: Dictionary = {"creatures": {}, "finds": {}, "variants": {}}
 var respawn_point: Vector2 = Vector2.ZERO
 
 var ui_layer: CanvasLayer
@@ -414,6 +414,20 @@ func on_creature_sighted(a) -> void:
 	var creatures: Dictionary = journal["creatures"]
 	var first: bool = not creatures.has(a.kind)
 	creatures[a.kind] = int(creatures.get(a.kind, 0)) + 1
+	# Each colour variant is logged separately for journal completion.
+	var variants: Dictionary = journal["variants"]
+	var key: String = "%s:%d" % [a.kind, maxi(a.variant, 0)]
+	var first_variant: bool = not variants.has(key)
+	variants[key] = int(variants.get(key, 0)) + 1
+	if a.variant > 0:
+		var vcol: Color = ItemDB.VARIANT_COLORS[a.variant]
+		if first_variant:
+			var bonus: int = ItemDB.VARIANT_REWARD[a.variant]
+			coins += bonus
+			message("%s spotted! New journal entry (+%d coins)." % [a.display_name(), bonus], vcol)
+		else:
+			message("A %s!" % a.display_name(), vcol)
+		_rare_burst(a.position, vcol)
 	if not a.is_rare():
 		return
 	var col: Color = ItemDB.RARITY_COLORS[3 if bool(a.data.get("boss", false)) or a.kind == "spirit" or a.kind == "white_stag" else 2]
@@ -1163,6 +1177,7 @@ func _apply_save(d: Dictionary) -> void:
 		stats = st
 	var jr = d.get("journal", {})
 	if jr is Dictionary:
-		journal = {"creatures": jr.get("creatures", {}), "finds": jr.get("finds", {})}
+		journal = {"creatures": jr.get("creatures", {}), "finds": jr.get("finds", {}),
+			"variants": jr.get("variants", {})}
 	for i in stores.size():
 		store_seen[i] = exploration.is_discovered(world.stores[i])

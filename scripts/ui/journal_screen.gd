@@ -6,6 +6,7 @@ const UI = preload("res://scripts/ui/ui_util.gd")
 const Art = preload("res://scripts/art.gd")
 const ItemDB = preload("res://scripts/data/item_db.gd")
 const AnimalScript = preload("res://scripts/entities/animal.gd")
+const VariantShader = preload("res://shaders/variant.gdshader")
 
 const SECTIONS := [
 	["Wildlife", ["rabbit", "deer", "duck"]],
@@ -25,13 +26,15 @@ const HINTS := {
 const FIND_ORDER := ["rabbit_foot", "antler", "wolf_fang", "wildcat_claw", "bear_claw", "amber",
 	"bird_egg", "golden_mushroom", "arrowhead", "old_coin", "fox_pelt", "loon_feather", "owl_feather",
 	"moose_antler", "white_antler", "golden_trout", "elder_claw", "spirit_pearl", "coin_purse",
-	"compass", "gem", "gold_idol", "old_boot"]
+	"compass", "gem", "gold_idol", "shiny_tuft", "silver_pelt", "golden_pelt", "old_boot"]
 
 var main
 var content: VBoxContainer
 var creature_grid: GridContainer
 var finds_grid: GridContainer
 var summary: Label
+var progress: Control
+var _completion: float = 0.0
 
 
 func _ready() -> void:
@@ -42,10 +45,14 @@ func _ready() -> void:
 	content = m[1]
 	summary = UI.label("", 9, Color(1.0, 0.9, 0.6))
 	content.add_child(summary)
+	progress = Control.new()
+	progress.custom_minimum_size = Vector2(0, 16)
+	progress.draw.connect(_draw_progress)
+	content.add_child(progress)
 	var hb := HBoxContainer.new()
 	content.add_child(hb)
 	var left := ScrollContainer.new()
-	left.custom_minimum_size = Vector2(520, 420)
+	left.custom_minimum_size = Vector2(600, 420)
 	hb.add_child(left)
 	creature_grid = GridContainer.new()
 	creature_grid.columns = 1
@@ -53,11 +60,11 @@ func _ready() -> void:
 	left.add_child(creature_grid)
 	hb.add_child(VSeparator.new())
 	var right := VBoxContainer.new()
-	right.custom_minimum_size = Vector2(320, 0)
+	right.custom_minimum_size = Vector2(300, 0)
 	hb.add_child(right)
 	right.add_child(UI.label("Rare finds", 11, Color(1.0, 0.85, 0.45)))
 	finds_grid = GridContainer.new()
-	finds_grid.columns = 6
+	finds_grid.columns = 5
 	right.add_child(finds_grid)
 	content.add_child(UI.button("Close (J)", func(): main.close_screen()))
 
@@ -70,9 +77,12 @@ func open() -> void:
 func refresh() -> void:
 	var creatures: Dictionary = main.journal["creatures"]
 	var finds: Dictionary = main.journal["finds"]
+	var variants: Dictionary = main.journal.get("variants", {})
 	UI.clear_children(creature_grid)
 	var seen: int = 0
 	var total: int = 0
+	var vseen: int = 0
+	var vtotal: int = 0
 	for sec in SECTIONS:
 		creature_grid.add_child(UI.label(sec[0], 11, Color(1.0, 0.85, 0.45)))
 		for kind in sec[1]:
@@ -80,7 +90,17 @@ func refresh() -> void:
 			var n: int = int(creatures.get(kind, 0))
 			if n > 0:
 				seen += 1
-			creature_grid.add_child(_creature_row(kind, n))
+			var got: Array = []
+			for v in 4:
+				var c: int = int(variants.get("%s:%d" % [kind, v], 0))
+				# Older saves only counted sightings: treat those as Normal.
+				if v == 0 and c == 0 and n > 0:
+					c = n
+				got.append(c)
+				vtotal += 1
+				if c > 0:
+					vseen += 1
+			creature_grid.add_child(_creature_row(kind, n, got))
 	UI.clear_children(finds_grid)
 	var found: int = 0
 	for id in FIND_ORDER:
@@ -89,31 +109,58 @@ func refresh() -> void:
 			found += 1
 		finds_grid.add_child(_find_cell(id, n2))
 	var bottle: int = int(finds.get("bottle", 0))
-	summary.text = "Creatures seen: %d / %d      Rare finds: %d / %d%s" % [
-		seen, total, found, FIND_ORDER.size(),
-		"      Bottles found: %d" % bottle if bottle > 0 else ""]
+	_completion = float(vseen + found) / float(maxi(1, vtotal + FIND_ORDER.size()))
+	summary.text = "Journal %d%% complete      Creatures %d / %d      Colour variants %d / %d      Rare finds %d / %d%s" % [
+		int(round(_completion * 100.0)), seen, total, vseen, vtotal, found, FIND_ORDER.size(),
+		"      Bottles %d" % bottle if bottle > 0 else ""]
+	progress.queue_redraw()
 
 
-func _creature_row(kind: String, n: int) -> HBoxContainer:
+func _creature_row(kind: String, n: int, got: Array) -> HBoxContainer:
 	var row := HBoxContainer.new()
-	var tr := TextureRect.new()
-	tr.texture = Art.creature_frame(kind, 0)
-	tr.custom_minimum_size = Vector2(56, 56)
-	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	tr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	if n == 0:
-		tr.modulate = Color(0.08, 0.06, 0.12, 0.85)  # silhouette
-	row.add_child(tr)
-	var vb := VBoxContainer.new()
-	row.add_child(vb)
+	var info := VBoxContainer.new()
+	info.custom_minimum_size = Vector2(250, 0)
+	row.add_child(info)
 	var title: String = str(AnimalScript.NAMES.get(kind, kind)) if n > 0 else "???"
 	var rare: bool = bool(AnimalScript.KINDS[kind].get("rare", false))
 	var col: Color = ItemDB.RARITY_COLORS[2] if rare else Color(0.95, 0.93, 0.86)
-	vb.add_child(UI.label(title, 10, col if n > 0 else Color(0.6, 0.6, 0.65)))
+	info.add_child(UI.label(title, 10, col if n > 0 else Color(0.6, 0.6, 0.65)))
 	var sub: String = "Seen %d time%s" % [n, "" if n == 1 else "s"] if n > 0 else str(HINTS.get(kind, "Not yet seen."))
-	vb.add_child(UI.label(sub, 8, Color(0.75, 0.78, 0.82)))
+	var sl := UI.label(sub, 8, Color(0.75, 0.78, 0.82))
+	sl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	info.add_child(sl)
+	# One slot per colour variant: tinted thumbnail once seen, silhouette until then.
+	for v in 4:
+		var slot := VBoxContainer.new()
+		slot.add_theme_constant_override("separation", 0)
+		var tr := TextureRect.new()
+		tr.texture = Art.creature_frame(kind, 0)
+		tr.custom_minimum_size = Vector2(56, 56)
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		tr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		var c: int = int(got[v])
+		if c == 0:
+			tr.modulate = Color(0.08, 0.06, 0.12, 0.8)
+		elif v > 0:
+			var mat := ShaderMaterial.new()
+			mat.shader = VariantShader
+			mat.set_shader_parameter("mode", v)
+			tr.material = mat
+		tr.tooltip_text = "%s - %s" % [ItemDB.VARIANT_NAMES[v], ("seen %d" % c) if c > 0 else "not yet seen"]
+		slot.add_child(tr)
+		var tag := UI.label(ItemDB.VARIANT_NAMES[v] if c > 0 else "?", 7,
+			ItemDB.VARIANT_COLORS[v] if c > 0 else Color(0.45, 0.45, 0.5))
+		tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		slot.add_child(tag)
+		row.add_child(slot)
 	return row
+
+
+func _draw_progress() -> void:
+	var w: float = progress.size.x
+	progress.draw_rect(Rect2(0, 3, w, 10), Color(0.1, 0.08, 0.13))
+	progress.draw_rect(Rect2(1, 4, (w - 2) * _completion, 8), Color(1.0, 0.81, 0.25))
 
 
 func _find_cell(id: String, n: int) -> Control:

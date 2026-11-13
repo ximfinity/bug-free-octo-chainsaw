@@ -8,6 +8,9 @@ extends Node2D
 
 const Art = preload("res://scripts/art.gd")
 const Tiles = preload("res://scripts/world/tiles.gd")
+const ItemDB = preload("res://scripts/data/item_db.gd")
+const FX = preload("res://scripts/fx/fx.gd")
+const VariantShader = preload("res://shaders/variant.gdshader")
 
 ## aggro: tiles at which a predator notices you (0 = only when hurt).
 ## swim: 0 land only, 1 shallows too, 2 water animal.
@@ -58,6 +61,8 @@ const LEASH := 32.0 * 16
 const GIVE_UP := 32.0 * 13
 
 var kind: String = "rabbit"
+## Colour variant: -1 = roll on spawn, 0 normal, 1 shiny, 2 silver, 3 gold.
+var variant: int = -1
 var main
 var hp: int = 1
 var max_hp: int = 1
@@ -115,6 +120,9 @@ func _ready() -> void:
 		add_child(glow)
 	if is_rare():
 		_special_t = randf_range(3.0, 7.0)
+	if variant < 0:
+		variant = ItemDB.roll_variant(main.luck_mult() if main != null else 1.0)
+	_apply_variant()
 	alert = Sprite2D.new()
 	alert.texture = Art.prop(Art.ALERT)
 	alert.position = Vector2(0, -52 if kind != "bear" else -64)
@@ -132,6 +140,35 @@ func is_predator() -> bool:
 	return bool(data.get("predator", false))
 
 
+func _apply_variant() -> void:
+	if variant <= 0:
+		return
+	var mat := ShaderMaterial.new()
+	mat.shader = VariantShader
+	mat.set_shader_parameter("mode", variant)
+	mat.set_shader_parameter("sheen_offset", randf() * 4.0)
+	sprite.material = mat
+	var sp: CPUParticles2D = FX.make_sparkles()
+	sp.color = ItemDB.VARIANT_COLORS[variant]
+	sp.amount = 4 + variant * 2
+	sp.position = Vector2(0, -20)
+	sp.emission_sphere_radius = 16.0 if kind != "elder_bear" else 30.0
+	sp.z_index = 1
+	add_child(sp)
+	if variant == 3:
+		var lt := PointLight2D.new()
+		lt.texture = Art.light_texture()
+		lt.texture_scale = 0.7
+		lt.color = Color(1.0, 0.85, 0.4)
+		lt.energy = 0.7
+		lt.position = Vector2(0, -16)
+		add_child(lt)
+
+
+func variant_name() -> String:
+	return ItemDB.VARIANT_NAMES[clampi(variant, 0, 3)]
+
+
 func is_rare() -> bool:
 	return bool(data.get("rare", false))
 
@@ -142,7 +179,10 @@ func watch_only() -> bool:
 
 
 func display_name() -> String:
-	return str(NAMES.get(kind, kind.capitalize()))
+	var base: String = str(NAMES.get(kind, kind.capitalize()))
+	if variant > 0:
+		return "%s %s" % [variant_name(), base]
+	return base
 
 
 ## Can this animal hurt the player right now? (Used by partner AI / HUD.)
@@ -456,6 +496,9 @@ func _die() -> void:
 		if amount > 0:
 			main.spawn_pickup(d[0], amount, position + Vector2(randf_range(-12, 12), randf_range(-8, 8)))
 	main.roll_rare_drops(kind, position)
+	if variant > 0:
+		main.spawn_pickup(ItemDB.VARIANT_TROPHY[variant], 1, position + Vector2(0, -6))
+
 	main.stats["kills"] = int(main.stats.get("kills", 0)) + 1
 	var tw := create_tween()
 	tw.tween_property(self, "modulate:a", 0.0, 0.4)
