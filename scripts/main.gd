@@ -554,6 +554,15 @@ func available_actions() -> Array:
 	a.append(["map", "Map"])
 	a.append(["inventory", "Pack"])
 	a.append(["journal", "Journal"])
+	# Keep the bar on screen: drop the always-known basics first.
+	var drop_order: Array = ["sprint", "move", "journal", "inventory", "map", "call_partner"]
+	for act in drop_order:
+		if a.size() <= 8:
+			break
+		for i in range(a.size() - 1, -1, -1):
+			if a[i][0] == act:
+				a.remove_at(i)
+				break
 	return a
 
 

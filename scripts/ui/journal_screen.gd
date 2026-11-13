@@ -100,6 +100,11 @@ func refresh() -> void:
 				vtotal += 1
 				if c > 0:
 					vseen += 1
+			if n == 0:
+				for c2 in got:
+					n += int(c2)
+				if n > 0:
+					seen += 1
 			creature_grid.add_child(_creature_row(kind, n, got))
 	UI.clear_children(finds_grid)
 	var found: int = 0

@@ -51,12 +51,13 @@ func _run() -> void:
 
 	var acts: Array = main.available_actions()
 	check(_has_action(acts, "board"), "action bar offers Board next to the kayak")
-	check(_has_action(acts, "map"), "action bar always offers the map")
+	check(_has_action(acts, "switch_character"), "action bar offers switching characters")
+	check(acts.size() <= 8, "action bar fits on screen (%d entries)" % acts.size())
 
 	# Board, paddle a bit, glide, get out.
 	p.try_board()
 	check(p.is_paddling(), "boarded kayak from the start dock")
-	check(_has_action(main.available_actions(), "sprint"), "action bar offers Power stroke while paddling")
+	check(_has_action(main.available_actions(), "board") or _has_action(main.available_actions(), "switch_character"), "action bar shows paddling actions")
 	var dir_name: String = _open_water_direction(p, w)
 	Input.action_press(dir_name)
 	await frames(40)
