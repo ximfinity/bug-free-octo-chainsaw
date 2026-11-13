@@ -620,7 +620,119 @@ def draw_danger(cv, kind, frame):
         cv.circle(40.5, 22.5, 1.1, rgb("#2b2033"))
 
 
-CREATURE_ORDER = ["rabbit", "deer", "duck", "wolf", "spider", "wildcat", "bear"]
+def swap_colors(cv, mapping):
+    """Exact colour swap on a Canvas before reduction (fills are exact)."""
+    a = np.asarray(cv.img).copy()
+    for src, dst in mapping.items():
+        m = (a[..., 0] == src[0]) & (a[..., 1] == src[1]) & (a[..., 2] == src[2]) & (a[..., 3] > 0)
+        a[m, 0], a[m, 1], a[m, 2] = dst[0], dst[1], dst[2]
+    cv.img = Image.fromarray(a, "RGBA")
+    cv.d = ImageDraw.Draw(cv.img)
+
+
+def draw_rare(cv, kind, frame):
+    s = [0, 1][frame]
+    if kind == "white_stag":
+        draw_creature(cv, "deer", frame)
+        swap_colors(cv, {rgb("#b5713c"): rgb("#f6f2ea"), rgb("#8a5128"): rgb("#d9d2c6"),
+                         rgb("#f2dcc0"): rgb("#ffffff"), rgb("#e8d2a8"): rgb("#ffd23f")})
+        # extra-grand golden antlers
+        for i, (ax, ay) in enumerate(((35, 8), (37, 7))):
+            cv.line(ax, ay, ax - 4 + i * 6, ay - 7, rgb("#ffd23f"), 1.2)
+            cv.line(ax - 2 + i * 4, ay - 4, ax - 5 + i * 8, ay - 5, rgb("#ffd23f"), 1.0)
+    elif kind == "moose":
+        hide, hide_d, light = rgb("#5a3d2a"), rgb("#3e2a1c"), rgb("#7a5a40")
+        for lx, o in ((12, s), (16, -s), (31, -s), (35, s)):
+            cv.line(lx, 30, lx + o * 1.5, 45, hide_d, 3.0)
+        cv.ellipse(23, 26, 14, 8.5, hide)
+        cv.ellipse(18, 21, 8, 3.5, light)
+        cv.poly([(15, 18), (24, 14), (30, 19)], hide_d)  # shoulder hump
+        cv.line(33, 23, 37, 18, hide, 6)
+        cv.ellipse(41, 19, 6, 4, hide, 0.3)
+        cv.ellipse(45.5, 21, 2.6, 2.4, hide_d)
+        cv.line(39, 23, 39, 28, hide_d, 2)  # bell
+        cv.circle(40, 16.5, 1.0, P["eye"])
+        for side in (-1, 1):  # broad palmate antlers
+            cx, cy = 38 + side * 1.5, 13
+            cv.ellipse(cx + side * 5, cy - 3, 6, 3, rgb("#e8d2a8"), side * -0.4)
+            for k in range(3):
+                cv.line(cx + side * (3 + k * 3), cy - 4, cx + side * (4 + k * 3), cy - 8, rgb("#e8d2a8"), 1.0)
+    elif kind == "otter":
+        fur, fur_d, belly = rgb("#7a5234"), rgb("#56382a"), rgb("#c9a27a")
+        cv.ellipse(24, 38.5, 15, 2.2, rgb("#bfeeff"))
+        cv.ellipse(22, 34, 12, 4.8, fur)
+        cv.ellipse(24, 36, 8, 2.2, belly)
+        cv.poly([(10, 33), (2, 30 + s * 2), (10, 36)], fur_d)
+        cv.circle(34, 31, 5, fur)
+        cv.ellipse(37.5, 33, 3.2, 2.4, belly)
+        cv.circle(36, 29.5, 1.0, P["eye"])
+        cv.circle(39.5, 32, 0.9, rgb("#2b2033"))
+        cv.circle(31.5, 27.5, 1.3, fur_d)
+        for k in range(2):
+            cv.line(38, 33 + k, 43, 32 + k * 2, rgb("#f2e4d0"), 0.5)
+    elif kind == "loon":
+        body = rgb("#2b2b38")
+        cv.ellipse(24, 38.5 + s * 0.3, 14, 1.4, rgb("#bfeeff"))
+        cv.ellipse(23, 33, 12, 5.5, body)
+        for k in range(5):  # checker back
+            for j in range(2):
+                cv.rect(15 + k * 3.2, 30.5 + j * 2.5, 16.4 + k * 3.2, 31.7 + j * 2.5, rgb("#f4f4f4"))
+        cv.poly([(31, 31), (34, 22), (37, 24), (35, 32)], body)
+        cv.rect(32.5, 26, 35.5, 27.2, rgb("#f4f4f4"))
+        cv.circle(36, 21.5, 3.8, body)
+        cv.poly([(39, 21), (45, 22.3), (39, 23.2)], rgb("#1a1a22"))
+        cv.circle(37, 20.5, 1.0, rgb("#e0392b"))
+    elif kind == "fox":
+        fur, fur_d, light = rgb("#e8692a"), rgb("#b84a1a"), rgb("#fff3e6")
+        for lx, o in ((16, s), (19, -s), (29, -s), (32, s)):
+            cv.line(lx, 31, lx + o * 1.5, 41, rgb("#2b2033"), 2.0)
+        cv.poly([(13, 27), (2, 22 - s * 2), (1, 28), (12, 31)], fur)
+        cv.circle(2.5, 25 - s, 2.8, light)
+        cv.ellipse(23, 28, 10, 5.5, fur)
+        cv.ellipse(24, 31, 7, 2.2, light)
+        cv.circle(34, 24, 5, fur)
+        cv.poly([(36, 25), (43, 26.5), (36, 28.5)], light)
+        cv.circle(42.8, 26.3, 1.0, rgb("#2b2033"))
+        cv.poly([(31, 21), (31.5, 14), (35, 20)], fur_d)
+        cv.poly([(35, 20), (37.5, 14), (38.5, 21)], fur)
+        cv.circle(36, 23, 1.0, P["eye"])
+    elif kind == "owl":
+        body, body_d, light = rgb("#8a6a4a"), rgb("#5e4630"), rgb("#d9c4a0")
+        cv.rect(8, 41, 40, 44, rgb("#6b4a33"))  # branch
+        cv.ellipse(24, 30, 9, 12, body)
+        cv.ellipse(24, 33, 6, 8, light)
+        for k in range(3):
+            cv.line(20 + k * 4, 30, 21 + k * 4, 38, body_d, 0.8)
+        cv.circle(24, 18, 7.5, body)
+        cv.poly([(17, 13), (18, 6), (21, 12)], body_d)
+        cv.poly([(27, 12), (30, 6), (31, 13)], body_d)
+        for ex in (21, 27):
+            cv.circle(ex, 18, 3, rgb("#ffd23f"))
+            cv.circle(ex, 18, 1.4, rgb("#2b2033"))
+        cv.poly([(23, 20.5), (25, 20.5), (24, 24)], rgb("#e8a83a"))
+        cv.rect(20, 40, 22, 42, rgb("#e8a83a"))
+        cv.rect(26, 40, 28, 42, rgb("#e8a83a"))
+    elif kind == "spirit":
+        glow, core, deep = rgb("#7af0ff"), rgb("#e8ffff"), rgb("#3ab8e0")
+        cv.ellipse(24, 40, 12, 2.6, rgb("#bfeeff"))
+        cv.poly([(15, 40), (18, 22), (30, 22), (33, 40), (29, 37 - s), (24, 40), (19, 37 + s)], glow)
+        cv.poly([(19, 38), (21, 25), (27, 25), (29, 38)], deep)
+        cv.circle(24, 17, 6.5, glow)
+        cv.circle(24, 17, 4.2, core)
+        for ex in (22, 26):
+            cv.circle(ex, 17, 0.9, rgb("#2b6a8a"))
+        for k in range(3):  # floating motes
+            cv.circle(12 + k * 12, 9 + ((k + s) % 2) * 3, 1.2, core)
+    elif kind == "elder_bear":
+        draw_danger(cv, "bear", frame)
+        swap_colors(cv, {rgb("#6b4a33"): rgb("#c08a3e"), rgb("#4a3222"): rgb("#8a5a24"),
+                         rgb("#8f6848"): rgb("#e8b862"), rgb("#c9a27a"): rgb("#f2dcb0")})
+        for k in range(3):  # silver battle scars
+            cv.line(17 + k * 5, 22, 20 + k * 5, 30, rgb("#f4f1ea"), 0.9)
+
+
+RARE_KINDS = ["white_stag", "moose", "otter", "loon", "fox", "owl", "spirit", "elder_bear"]
+CREATURE_ORDER = ["rabbit", "deer", "duck", "wolf", "spider", "wildcat", "bear"] + RARE_KINDS
 
 
 def make_creatures():
@@ -628,11 +740,17 @@ def make_creatures():
     for r, kind in enumerate(CREATURE_ORDER):
         for f in range(2):
             cv = Canvas(48, 48)
-            if kind in ("spider", "wildcat", "bear"):
+            if kind in RARE_KINDS:
+                draw_rare(cv, kind, f)
+            elif kind in ("spider", "wildcat", "bear"):
                 draw_danger(cv, kind, f)
             else:
                 draw_creature(cv, kind, f)
-            sh = None if kind == "duck" else ((24, 44, 17, 3) if kind == "bear" else (24, 44, 11, 2.5))
+            sh = (24, 44, 11, 2.5)
+            if kind in ("duck", "otter", "loon", "spirit", "owl"):
+                sh = None
+            elif kind in ("bear", "elder_bear", "moose"):
+                sh = (24, 44, 17, 3)
             atlas.paste(cv.finish(True, sh), (f * 48, r * 48))
     atlas.save(OUT / "creatures.png")
 
@@ -1173,6 +1291,91 @@ def make_items():
         cv.ellipse(16, 18, 9, 7, rgb("#8d8f86"))
         cv.ellipse(14, 16, 4, 2.5, rgb("#c9c9bd"))
 
+    def antler(cv, col, big):
+        cv.line(8, 27, 14, 14, col, 2.4)
+        cv.line(14, 14, 22, 5, col, 2.0)
+        cv.line(13, 17, 6, 10, col, 1.6)
+        cv.line(18, 10, 24, 12, col, 1.6)
+        if big:
+            cv.line(20, 7, 27, 4, col, 1.4)
+            cv.line(11, 21, 4, 18, col, 1.4)
+
+    def moose_antler(cv):
+        cv.ellipse(18, 13, 10, 6, rgb("#e8d2a8"), -0.3)
+        for k in range(4):
+            cv.line(11 + k * 5, 9, 12 + k * 5, 3, rgb("#e8d2a8"), 1.6)
+        cv.line(10, 16, 6, 27, rgb("#c9b088"), 2.6)
+
+    def feather(cv, col, tip):
+        cv.ellipse(16, 15, 4.5, 11, col, 0.5)
+        cv.line(9, 28, 22, 3, rgb("#f4f1ea"), 0.8)
+        cv.ellipse(20, 7, 2.6, 3.5, tip, 0.5)
+
+    def golden_trout(cv):
+        cv.ellipse(16, 16, 11, 5.8, rgb("#ffcf3f"))
+        cv.poly([(5, 16), (0, 10), (1, 22)], rgb("#e8a514"))
+        cv.line(8, 17, 24, 17, rgb("#ff8a5a"), 1.4)
+        cv.circle(23, 14.5, 1.3, P["eye"])
+        cv.circle(13, 13, 1, rgb("#fff6c2"))
+
+    def pearl(cv):
+        cv.circle(16, 16, 9, rgb("#c9f4ff"))
+        cv.circle(16, 16, 6.5, rgb("#e8ffff"))
+        cv.circle(13, 12, 2.4, rgb("#ffffff"))
+
+    def claw(cv, col, n):
+        for k in range(n):
+            x = 8 + k * 6
+            cv.poly([(x, 26), (x + 4, 26), (x + 6, 8), (x + 2, 12)], col)
+
+    def fang(cv):
+        cv.poly([(12, 6), (20, 6), (16, 27)], rgb("#f4f1ea"))
+        cv.line(16, 8, 16, 22, rgb("#d9d2c6"), 1)
+
+    def amber(cv):
+        cv.poly([(10, 8), (22, 6), (26, 18), (16, 27), (7, 19)], rgb("#ffa51f"))
+        cv.poly([(10, 8), (16, 7), (14, 15), (8, 17)], rgb("#ffd06a"))
+        cv.circle(17, 17, 1.6, rgb("#5a3a1a"))
+
+    def egg(cv):
+        cv.ellipse(16, 17, 7, 9.5, rgb("#bfe8ff"))
+        for x, y in ((13, 14), (18, 20), (15, 22), (19, 12)):
+            cv.circle(x, y, 0.9, rgb("#5a8aa8"))
+
+    def gold_mushroom(cv):
+        cv.rect(14, 16, 18, 27, rgb("#f5ead6"))
+        cv.ellipse(16, 15, 10, 6.5, rgb("#ffcf3f"))
+        cv.ellipse(12, 13, 3, 1.6, rgb("#fff6c2"))
+        cv.circle(20, 12, 1, rgb("#ffffff"))
+
+    def arrowhead(cv):
+        cv.poly([(16, 4), (24, 20), (16, 17), (8, 20)], rgb("#5a5466"))
+        cv.poly([(16, 4), (16, 17), (8, 20)], rgb("#7d7688"))
+        cv.rect(14, 18, 18, 27, rgb("#8a5428"))
+
+    def old_coin(cv):
+        cv.circle(16, 16, 10, rgb("#a8b0b8"))
+        cv.circle(16, 16, 7.5, rgb("#c9d0d8"))
+        cv.rect(13, 12, 19, 14, rgb("#7d858c"))
+        cv.rect(15, 14, 17, 21, rgb("#7d858c"))
+
+    def boot(cv):
+        cv.rect(10, 5, 18, 21, rgb("#6b4a33"))
+        cv.poly([(10, 18), (26, 20), (26, 27), (10, 27)], rgb("#5a3a22"))
+        cv.circle(22, 10, 2.5, rgb("#3f9e5a"))
+
+    def bottle(cv):
+        cv.ellipse(16, 19, 7, 9, rgb("#7ad0a8"))
+        cv.rect(14, 4, 18, 11, rgb("#7ad0a8"))
+        cv.rect(14, 3, 18, 5, rgb("#8a5428"))
+        cv.rect(13, 15, 19, 22, rgb("#f2dcab"))
+
+    def rabbit_foot(cv):
+        cv.ellipse(16, 18, 6, 9, rgb("#f2e4d0"))
+        cv.ellipse(16, 25, 5, 3, rgb("#e8d2b8"))
+        cv.line(16, 9, 16, 3, rgb("#c2503a"), 1.6)
+        cv.circle(16, 3, 2, rgb("#ffd23f"))
+
     for fn in (lambda c: meat(c, False), lambda c: meat(c, True), lambda c: fish(c, False),
                lambda c: fish(c, True), berries, trailmix, hide, wood, arrows, purse, compass, gem,
                idol, tmap, shovel, bow, tent, rod, coin,
@@ -1180,7 +1383,15 @@ def make_items():
                lambda c: seeds(c, rgb("#e8782a")), carrot, lambda c: potato(c, False),
                lambda c: potato(c, True), pumpkin, silk,
                lambda c: pelt(c, rgb("#c98a4a"), rgb("#7a4a22")),
-               lambda c: pelt(c, rgb("#6b4a33"), rgb("#8f6848")), knife, hatchet, worms, stone, mushroom):
+               lambda c: pelt(c, rgb("#6b4a33"), rgb("#8f6848")), knife, hatchet, worms, stone, mushroom,
+               lambda c: antler(c, rgb("#f6f2ea"), True), moose_antler,
+               lambda c: pelt(c, rgb("#e8692a"), rgb("#fff3e6")),
+               lambda c: feather(c, rgb("#2b2b38"), rgb("#f4f4f4")),
+               lambda c: feather(c, rgb("#8a6a4a"), rgb("#d9c4a0")), golden_trout, pearl,
+               lambda c: claw(c, rgb("#ffd23f"), 3), rabbit_foot,
+               lambda c: antler(c, rgb("#e8d2a8"), False), fang, amber,
+               lambda c: claw(c, rgb("#f4f1ea"), 2), lambda c: claw(c, rgb("#d9d2c6"), 3),
+               egg, gold_mushroom, arrowhead, old_coin, boot, bottle):
         icon(fn)
     atlas = Image.new("RGBA", (8 * 32, ((len(icons) + 7) // 8) * 32), (0, 0, 0, 0))
     for i, c in enumerate(icons):

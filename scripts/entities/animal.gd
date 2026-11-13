@@ -26,7 +26,33 @@ const KINDS := {
 		"aggro": 5.0, "stealth": true, "drops": [["wildcat_pelt", 1, 1], ["meat_raw", 1, 1]], "predator": true},
 	"bear": {"hp": 10, "speed": 40.0, "chase": 125.0, "lunge": 260.0, "damage": 30.0, "swim": 1,
 		"aggro": 3.0, "windup": 0.75, "drops": [["bear_hide", 1, 1], ["bear_meat", 2, 3]], "predator": true},
+	# --- rare creatures (logged in the Creature Journal) -----------------
+	"white_stag": {"hp": 3, "speed": 60.0, "flee_speed": 205.0, "swim": 0, "rare": true, "flee": 230.0,
+		"drops": [["white_antler", 1, 1], ["meat_raw", 2, 3]], "reward": 200},
+	"fox": {"hp": 2, "speed": 70.0, "flee_speed": 190.0, "swim": 0, "rare": true, "flee": 180.0,
+		"drops": [["fox_pelt", 1, 1]], "reward": 60},
+	"moose": {"hp": 8, "speed": 38.0, "chase": 115.0, "lunge": 240.0, "damage": 22.0, "swim": 1,
+		"aggro": 2.5, "windup": 0.7, "rare": true, "predator": true,
+		"drops": [["moose_antler", 1, 1], ["hide", 2, 2], ["meat_raw", 3, 4]], "reward": 120},
+	"elder_bear": {"hp": 25, "speed": 45.0, "chase": 135.0, "lunge": 290.0, "damage": 40.0, "swim": 1,
+		"aggro": 4.0, "windup": 0.65, "rare": true, "predator": true, "boss": true,
+		"drops": [["elder_claw", 1, 1], ["bear_hide", 2, 2], ["bear_meat", 4, 5]], "reward": 300},
+	"otter": {"hp": 1, "speed": 45.0, "flee_speed": 90.0, "swim": 3, "rare": true, "watch_only": true,
+		"flee": 70.0, "drops": [], "reward": 80},
+	"loon": {"hp": 1, "speed": 22.0, "flee_speed": 60.0, "swim": 2, "rare": true, "watch_only": true,
+		"flee": 0.0, "drops": [], "reward": 80},
+	"owl": {"hp": 1, "speed": 0.0, "flee_speed": 0.0, "swim": 0, "rare": true, "watch_only": true,
+		"flee": 0.0, "drops": [], "reward": 90},
+	"spirit": {"hp": 1, "speed": 10.0, "flee_speed": 0.0, "swim": 2, "rare": true, "watch_only": true,
+		"flee": 0.0, "drops": [], "reward": 400},
 }
+const NAMES := {
+	"rabbit": "Rabbit", "deer": "Deer", "duck": "Mallard", "wolf": "Grey Wolf", "spider": "Giant Spider",
+	"wildcat": "Wildcat", "bear": "Black Bear", "white_stag": "White Stag", "fox": "Red Fox",
+	"moose": "Moose", "elder_bear": "Elder Bear", "otter": "River Otter", "loon": "Common Loon",
+	"owl": "Great Horned Owl", "spirit": "Lake Spirit",
+}
+const SIGHT_RANGE := 230.0
 const FLEE_RADIUS := 144.0
 const LEASH := 32.0 * 16
 const GIVE_UP := 32.0 * 13
@@ -54,6 +80,10 @@ var _hit_done: bool = false
 var sprite: Sprite2D
 var alert: Sprite2D
 var hp_bar: Node2D
+var _sighted: bool = false
+var _special_t: float = 0.0
+var _submerged: bool = false
+var glow: PointLight2D
 
 
 func _ready() -> void:
@@ -65,10 +95,26 @@ func _ready() -> void:
 	sprite = Sprite2D.new()
 	sprite.texture = Art.creature_frame(kind, 0)
 	sprite.offset = Vector2(0, -20)
-	if kind == "bear":
+	if kind == "bear" or kind == "moose":
 		sprite.scale = Vector2(1.25, 1.25)
 		sprite.offset = Vector2(0, -19)
+	elif kind == "elder_bear":
+		sprite.scale = Vector2(1.7, 1.7)
+		sprite.offset = Vector2(0, -19)
 	add_child(sprite)
+	if kind == "spirit":
+		var mat := CanvasItemMaterial.new()
+		mat.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
+		sprite.material = mat
+		glow = PointLight2D.new()
+		glow.texture = Art.light_texture()
+		glow.texture_scale = 1.2
+		glow.color = Color(0.5, 0.95, 1.0)
+		glow.energy = 0.9
+		glow.position = Vector2(0, -16)
+		add_child(glow)
+	if is_rare():
+		_special_t = randf_range(3.0, 7.0)
 	alert = Sprite2D.new()
 	alert.texture = Art.prop(Art.ALERT)
 	alert.position = Vector2(0, -52 if kind != "bear" else -64)
@@ -86,14 +132,35 @@ func is_predator() -> bool:
 	return bool(data.get("predator", false))
 
 
+func is_rare() -> bool:
+	return bool(data.get("rare", false))
+
+
+## Peaceful rare creatures you can only watch (arrows and swings pass by).
+func watch_only() -> bool:
+	return bool(data.get("watch_only", false))
+
+
+func display_name() -> String:
+	return str(NAMES.get(kind, kind.capitalize()))
+
+
 ## Can this animal hurt the player right now? (Used by partner AI / HUD.)
 func is_threat() -> bool:
 	return alive and is_predator() and not leaving and (state == "chase" or state == "windup" or state == "lunge")
 
 
+## Usable before _ready (data not loaded yet).
+func _can_stand_kind(p: Vector2) -> bool:
+	data = KINDS[kind]
+	return _can_stand(p)
+
+
 func _can_stand(p: Vector2) -> bool:
 	var t: int = main.world.tile_type_at_pos(p)
 	match int(data["swim"]):
+		3:
+			return Tiles.is_water(t)
 		2:
 			return t == Tiles.DEEP or t == Tiles.SHALLOW
 		1:
@@ -112,8 +179,13 @@ func _process(delta: float) -> void:
 	if _flash > 0.0:
 		_flash -= delta
 		sprite.modulate = Color(1, 0.4, 0.4) if _flash > 0.0 else Color.WHITE
+	_check_sighting()
 	var speed: float = float(data["speed"])
-	if is_predator():
+	if _special(delta):
+		speed = float(data["speed"])
+	elif not alive:
+		return
+	elif is_predator():
 		speed = _predator(delta)
 	else:
 		speed = _prey()
@@ -122,10 +194,95 @@ func _process(delta: float) -> void:
 	_animate(speed)
 
 
+## Log the creature in the journal the first time the player sees it.
+func _check_sighting() -> void:
+	if _sighted or _submerged:
+		return
+	var c = main.player
+	if c != null and c.position.distance_to(position) < SIGHT_RANGE:
+		_sighted = true
+		main.on_creature_sighted(self)
+
+
+## Unique behaviours for rare watch-only creatures. Returns true if it
+## handled movement this frame.
+func _special(delta: float) -> bool:
+	match kind:
+		"loon":
+			_special_t -= delta
+			if _special_t <= 0.0:
+				if _submerged:
+					_submerged = false
+					sprite.visible = true
+					main.ripple_at(position)
+					_special_t = randf_range(4.0, 8.0)
+				else:
+					# Dive and pop up somewhere nearby.
+					main.ripple_at(position)
+					if randf() < 0.25:
+						main.spawn_pickup("loon_feather", 1, position)
+					_submerged = true
+					sprite.visible = false
+					for i in 10:
+						var p: Vector2 = position + Vector2.RIGHT.rotated(randf() * TAU) * randf_range(60, 150)
+						if _can_stand(p):
+							position = p
+							break
+					_special_t = randf_range(2.0, 3.5)
+			if _submerged:
+				dir = Vector2.ZERO
+			else:
+				_wander()
+			return true
+		"owl":
+			dir = Vector2.ZERO
+			var c = main.nearest_character(position)
+			if c != null and c.position.distance_to(position) < 90.0:
+				_fly_away("owl_feather", 0.6)
+			return true
+		"spirit":
+			dir = Vector2.ZERO
+			sprite.position.y = sin(_anim * 2.0) * 4.0 - 4.0
+			sprite.modulate.a = 0.65 + 0.25 * sin(_anim * 3.0)
+			if glow:
+				glow.energy = 0.8 + 0.2 * sin(_anim * 3.0)
+			if not main.day_night.is_night():
+				_fly_away("", 0.0)
+				return true
+			for ch in main.party:
+				if ch.position.distance_to(position) < 70.0:
+					main.message("The Lake Spirit smiles and leaves a gift on the water.", Color(0.6, 0.95, 1.0))
+					ch.gain("spirit_pearl", 1, position)
+					main.on_rare_item(ch, "spirit_pearl")
+					_fly_away("", 0.0)
+					break
+			return true
+		"otter":
+			var c2 = main.nearest_character(position)
+			if c2 != null and c2.position.distance_to(position) < float(data["flee"]):
+				dir = (position - c2.position).normalized()
+			else:
+				_wander()
+			return true
+	return false
+
+
+func _fly_away(drop: String, chance: float) -> void:
+	if not alive:
+		return
+	alive = false
+	if drop != "" and randf() < chance:
+		main.spawn_pickup(drop, 1, position)
+	var tw := create_tween()
+	tw.tween_property(self, "position:y", position.y - 60.0, 0.9)
+	tw.parallel().tween_property(self, "modulate:a", 0.0, 0.9)
+	tw.tween_callback(queue_free)
+
+
 func _prey() -> float:
 	var c = main.nearest_character(position)
 	var to_c: Vector2 = c.position - position if c != null else Vector2(9999, 0)
-	if to_c.length() < FLEE_RADIUS:
+	if to_c.length() < float(data.get("flee", FLEE_RADIUS)):
 		_flee_timer = 1.5
 	if _flee_timer > 0.0:
 		dir = -to_c.normalized() if to_c.length() > 0.1 else Vector2.RIGHT
@@ -263,13 +420,17 @@ func _wander() -> void:
 func _draw_hp() -> void:
 	if hp >= max_hp or not alive:
 		return
-	var w: float = 30.0 if kind != "bear" else 44.0
+	var w: float = 30.0
+	if kind == "bear" or kind == "moose":
+		w = 44.0
+	elif kind == "elder_bear":
+		w = 64.0
 	hp_bar.draw_rect(Rect2(-w / 2, 0, w, 5), Color(0.13, 0.1, 0.16, 0.85))
 	hp_bar.draw_rect(Rect2(-w / 2 + 1, 1, (w - 2) * float(hp) / float(max_hp), 3), Color(0.95, 0.3, 0.3))
 
 
 func hit(damage: int, from_dir: Vector2, knockback: float = 6.0, attacker = null) -> void:
-	if not alive:
+	if not alive or watch_only():
 		return
 	hp -= damage
 	_flash = 0.15
@@ -294,6 +455,7 @@ func _die() -> void:
 		var amount: int = randi_range(int(d[1]), int(d[2]))
 		if amount > 0:
 			main.spawn_pickup(d[0], amount, position + Vector2(randf_range(-12, 12), randf_range(-8, 8)))
+	main.roll_rare_drops(kind, position)
 	main.stats["kills"] = int(main.stats.get("kills", 0)) + 1
 	var tw := create_tween()
 	tw.tween_property(self, "modulate:a", 0.0, 0.4)

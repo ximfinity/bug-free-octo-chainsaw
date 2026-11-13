@@ -28,6 +28,7 @@ const KEYS := {
 	"shoot_key": [KEY_X],
 	"switch_character": [KEY_V],
 	"call_partner": [KEY_T],
+	"journal": [KEY_J],
 }
 const PAD_BUTTONS := {
 	"board": [JOY_BUTTON_X],

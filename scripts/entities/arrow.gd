@@ -31,7 +31,7 @@ func _process(delta: float) -> void:
 		queue_free()
 		return
 	for a in get_tree().get_nodes_in_group("animals"):
-		if a.alive and a.position.distance_to(position + Vector2(0, 12)) < 20.0:
+		if a.alive and not a.watch_only() and a.position.distance_to(position + Vector2(0, 12)) < 20.0:
 			a.hit(2 if a.kind == "bear" else 1, direction, 6.0, shooter)
 			queue_free()
 			return

@@ -33,7 +33,10 @@ func _ready() -> void:
 	craft_box = VBoxContainer.new()
 	craft_box.custom_minimum_size = Vector2(280, 0)
 	hb.add_child(craft_box)
-	content.add_child(UI.button("Close (Tab)", func(): main.close_screen()))
+	var btns := HBoxContainer.new()
+	content.add_child(btns)
+	btns.add_child(UI.button("Close (Tab)", func(): main.close_screen()))
+	btns.add_child(UI.button("Creature Journal (J)", func(): main.open_screen(main.journal_screen)))
 
 
 func open() -> void:
@@ -59,7 +62,7 @@ func refresh() -> void:
 		var info: Dictionary = ItemDB.item(id)
 		var row := HBoxContainer.new()
 		row.add_child(UI.icon(int(info.get("icon", 12)), 16))
-		var name_l := UI.label("%s x%d" % [info.get("name", id), p.inventory.count(id)], 10)
+		var name_l := UI.label("%s x%d" % [info.get("name", id), p.inventory.count(id)], 10, ItemDB.rarity_color(id))
 		name_l.custom_minimum_size = Vector2(260, 0)
 		row.add_child(name_l)
 		if float(info.get("food", 0)) > 0.0:

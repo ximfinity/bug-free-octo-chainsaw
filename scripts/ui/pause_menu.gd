@@ -12,7 +12,7 @@ Space (hold) - chop, forage, till, plant, harvest, dig, revive
 G - fish from the kayak, press again on a bite (!)
 V - switch between Juniper and Rowan     T - call your partner over
 C - pitch / pack up camp      F - trade, light fire, cook, sleep
-Q - eat      Tab - pack, crafting, give items      M - map      Esc - menu"""
+Q - eat   Tab - pack & give items   J - creature journal   M - map   Esc - menu"""
 
 var main
 var content: VBoxContainer

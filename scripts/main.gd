@@ -25,6 +25,8 @@ const MapScreen = preload("res://scripts/ui/map_screen.gd")
 const InventoryScreen = preload("res://scripts/ui/inventory_screen.gd")
 const StoreScreen = preload("res://scripts/ui/store_screen.gd")
 const PauseMenu = preload("res://scripts/ui/pause_menu.gd")
+const JournalScreen = preload("res://scripts/ui/journal_screen.gd")
+const RippleFX = preload("res://scripts/fx/ripple.gd")
 
 const STORE_REACH := 84.0
 const CAMP_REACH := 60.0
@@ -64,6 +66,8 @@ var treasure_by_idx: Dictionary = {}
 var dug: Dictionary = {}
 var revealed_treasures: Dictionary = {}
 var stats: Dictionary = {"kills": 0, "treasures": 0}
+## Creature Journal: kind -> times sighted; rare item id -> times found.
+var journal: Dictionary = {"creatures": {}, "finds": {}}
 var respawn_point: Vector2 = Vector2.ZERO
 
 var ui_layer: CanvasLayer
@@ -72,6 +76,7 @@ var map_screen
 var inventory_screen
 var store_screen
 var pause_menu
+var journal_screen
 var death_panel: Control
 var fade: ColorRect
 var current_screen = null
@@ -218,6 +223,10 @@ func _build_ui() -> void:
 	store_screen.main = self
 	store_screen.visible = false
 	ui_layer.add_child(store_screen)
+	journal_screen = JournalScreen.new()
+	journal_screen.main = self
+	journal_screen.visible = false
+	ui_layer.add_child(journal_screen)
 	pause_menu = PauseMenu.new()
 	pause_menu.main = self
 	pause_menu.visible = false
@@ -315,6 +324,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		open_screen(inventory_screen)
 	elif event.is_action_pressed("switch_character"):
 		switch_character()
+	elif event.is_action_pressed("journal"):
+		open_screen(journal_screen)
 
 
 func open_screen(screen) -> void:
@@ -333,9 +344,86 @@ func close_screen() -> void:
 	get_tree().paused = false
 
 
-func message(text: String) -> void:
+func message(text: String, color: Color = Color.WHITE) -> void:
 	if hud:
-		hud.message(text)
+		hud.message(text, color)
+
+
+# ------------------------------------------------------------ rare finds
+## Doubles rare chances while anyone carries a Lucky Rabbit's Foot.
+func luck_mult() -> float:
+	for c in party:
+		if c.inventory.has("rabbit_foot"):
+			return 2.0
+	return 1.0
+
+
+## Rolls the rare drop table for a source (animal kind or activity).
+func roll_rare_drops(source: String, at: Vector2, who = null) -> void:
+	var table: Array = ItemDB.RARE_DROPS.get(source, [])
+	var luck: float = luck_mult()
+	for entry in table:
+		if randf() < float(entry[1]) * luck:
+			var id: String = entry[0]
+			if who != null:
+				who.gain(id, 1, at)
+				on_rare_item(who, id)
+			else:
+				spawn_pickup(id, 1, at + Vector2(randf_range(-10, 10), randf_range(-6, 6)))
+
+
+## Announces a rare item and logs it in the journal.
+func on_rare_item(who, id: String) -> void:
+	var r: int = ItemDB.rarity(id)
+	journal_add_find(id)
+	if r >= 1:
+		var tag: String = ItemDB.RARITY_NAMES[r].to_upper()
+		var name_txt: String = ItemDB.item_name(id)
+		var whose: String = "" if (who == null or who.controlled) else " (%s)" % who.char_name
+		message("%s find: %s!%s" % [tag, name_txt, whose], ItemDB.rarity_color(id))
+		if r >= 2 and who != null:
+			_rare_burst(who.position, ItemDB.rarity_color(id))
+	elif who != null and who.controlled:
+		message("+1 %s" % ItemDB.item_name(id))
+
+
+func journal_add_find(id: String) -> void:
+	var finds: Dictionary = journal["finds"]
+	finds[id] = int(finds.get(id, 0)) + 1
+
+
+func _rare_burst(at: Vector2, color: Color) -> void:
+	var sp: CPUParticles2D = FX.make_sparkles()
+	sp.position = at + Vector2(0, -20)
+	sp.color = color
+	sp.one_shot = true
+	sp.explosiveness = 0.8
+	sp.amount = 16
+	sp.z_index = 8
+	sp.emitting = true
+	add_child(sp)
+	get_tree().create_timer(2.0, false).timeout.connect(sp.queue_free)
+
+
+func ripple_at(at: Vector2) -> void:
+	FX.ripple(entities, at, 22.0, 1.0)
+
+
+## Called the first time the player sees each individual animal.
+func on_creature_sighted(a) -> void:
+	var creatures: Dictionary = journal["creatures"]
+	var first: bool = not creatures.has(a.kind)
+	creatures[a.kind] = int(creatures.get(a.kind, 0)) + 1
+	if not a.is_rare():
+		return
+	var col: Color = ItemDB.RARITY_COLORS[3 if bool(a.data.get("boss", false)) or a.kind == "spirit" or a.kind == "white_stag" else 2]
+	if first:
+		var reward: int = int(a.data.get("reward", 50))
+		coins += reward
+		message("New journal entry: %s! The naturalists at 100's of Kayaks send %d coins." % [a.display_name(), reward], col)
+		_rare_burst(a.position, col)
+	else:
+		message("You spot a %s!" % a.display_name(), col)
 
 
 func on_player_tile_changed(t: Vector2i) -> void:
@@ -451,6 +539,7 @@ func available_actions() -> Array:
 				break
 	a.append(["map", "Map"])
 	a.append(["inventory", "Pack"])
+	a.append(["journal", "Journal"])
 	return a
 
 
@@ -630,7 +719,8 @@ func dig_at(pos: Vector2, digger = null) -> void:
 	stats["treasures"] = int(stats.get("treasures", 0)) + 1
 	if digger.inventory.add(loot, 1) == 0:
 		spawn_pickup(loot, 1, pos)
-	message("Treasure! You found a %s and %d coins." % [ItemDB.item_name(loot), bonus])
+	journal_add_find(loot)
+	message("Treasure! You found a %s and %d coins." % [ItemDB.item_name(loot), bonus], ItemDB.rarity_color(loot))
 	_chest_effect(world.tile_center(tile))
 
 
@@ -997,6 +1087,7 @@ func save_game() -> bool:
 		"discovered": exploration.to_base64(),
 		"respawn": [respawn_point.x, respawn_point.y],
 		"stats": stats,
+		"journal": journal,
 	}
 	if camp != null:
 		d["camp"] = {"pos": [camp.position.x, camp.position.y], "lit": camp.lit}
@@ -1070,5 +1161,8 @@ func _apply_save(d: Dictionary) -> void:
 	var st = d.get("stats", {})
 	if st is Dictionary:
 		stats = st
+	var jr = d.get("journal", {})
+	if jr is Dictionary:
+		journal = {"creatures": jr.get("creatures", {}), "finds": jr.get("finds", {})}
 	for i in stores.size():
 		store_seen[i] = exploration.is_discovered(world.stores[i])

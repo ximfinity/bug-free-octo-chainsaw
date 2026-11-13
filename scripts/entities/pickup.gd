@@ -3,6 +3,7 @@ extends Node2D
 
 const Art = preload("res://scripts/art.gd")
 const ItemDB = preload("res://scripts/data/item_db.gd")
+const FX = preload("res://scripts/fx/fx.gd")
 const LIFETIME := 240.0
 
 var item_id: String = "meat_raw"
@@ -18,6 +19,20 @@ func _ready() -> void:
 	sprite.texture = Art.item(int(ItemDB.item(item_id).get("icon", 13)))
 	sprite.offset = Vector2(0, -16)
 	add_child(sprite)
+	# Rare items glitter in their rarity colour so you notice them.
+	var r: int = ItemDB.rarity(item_id)
+	if r >= 2:
+		var sp: CPUParticles2D = FX.make_sparkles()
+		sp.color = ItemDB.rarity_color(item_id)
+		sp.position = Vector2(0, -16)
+		sp.z_index = 1
+		add_child(sp)
+		var lt := PointLight2D.new()
+		lt.texture = Art.light_texture()
+		lt.texture_scale = 0.5
+		lt.color = ItemDB.rarity_color(item_id)
+		lt.energy = 0.8
+		add_child(lt)
 
 
 func _process(delta: float) -> void:
@@ -48,7 +63,9 @@ func _process(delta: float) -> void:
 	if true:
 		var added: int = who.inventory.add(item_id, amount)
 		if added > 0:
-			if who.controlled:
+			if ItemDB.rarity(item_id) >= 1:
+				main.on_rare_item(who, item_id)
+			elif who.controlled:
 				main.message("+%d %s" % [added, ItemDB.item_name(item_id)])
 			amount -= added
 		if amount <= 0:

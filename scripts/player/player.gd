@@ -617,16 +617,30 @@ func _process_fishing(delta: float) -> void:
 
 
 func _catch_fish() -> void:
-	var n: int = 2 if randf() < 0.2 else 1
 	if inventory.has("worms"):
 		inventory.remove("worms", 1)
+	fish_state = 0
+	bite_icon.visible = false
+	# Rare catches first.
+	var luck: float = main.luck_mult()
+	for entry in ItemDB.FISH_RARES:
+		if randf() < float(entry[1]) * luck:
+			var rid: String = entry[0]
+			if rid == "bottle":
+				main.message("You fish up a message in a bottle!", ItemDB.RARITY_COLORS[2])
+				if main.reveal_treasure_near(world.tile_at_pos(position)):
+					main.message("It's a treasure map! An X appears on your map (M).", ItemDB.RARITY_COLORS[2])
+				main.journal_add_find("bottle")
+			else:
+				gain(rid, 1, position)
+				main.on_rare_item(self, rid)
+			return
+	var n: int = 2 if randf() < 0.2 else 1
 	var added: int = inventory.add("fish_raw", n)
 	if added > 0:
 		main.message("Caught %d fish!" % added)
 	else:
 		main.message("Pack full - you let the fish go.")
-	fish_state = 0
-	bite_icon.visible = false
 
 
 func _cancel_fishing(msg: String) -> void:
@@ -761,6 +775,12 @@ func gain(id: String, n: int, at: Vector2) -> int:
 
 
 func perform_action(act: String, t: Vector2i) -> void:
+	_perform(act, t)
+	if act in ["chop", "forage", "till", "dig", "harvest"]:
+		main.roll_rare_drops(act, world.tile_center(t), self)
+
+
+func _perform(act: String, t: Vector2i) -> void:
 	var now: float = main.game_days()
 	var at: Vector2 = world.tile_center(t)
 	var edits = main.edits
@@ -955,6 +975,10 @@ func eat(id: String) -> bool:
 		return false
 	inventory.remove(id, 1)
 	digesting += food
+	var heal: float = float(ItemDB.item(id).get("heal", 0))
+	if heal > 0.0:
+		health = minf(100.0, health + heal)
+		poison = 0.0
 	if controlled:
 		main.message("You eat the %s." % ItemDB.item_name(id).to_lower())
 	return true

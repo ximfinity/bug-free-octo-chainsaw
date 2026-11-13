@@ -14,10 +14,10 @@ const ITEMS := {
 	"hide": {"name": "Animal Hide", "icon": 6, "stack": 10, "price": 8},
 	"wood": {"name": "Firewood", "icon": 7, "stack": 20, "price": 1},
 	"arrows": {"name": "Arrows", "icon": 8, "stack": 50, "price": 1},
-	"coin_purse": {"name": "Old Coin Purse", "icon": 9, "stack": 5, "price": 60, "treasure": true},
-	"compass": {"name": "Antique Compass", "icon": 10, "stack": 5, "price": 90, "treasure": true},
-	"gem": {"name": "River Gem", "icon": 11, "stack": 5, "price": 130, "treasure": true},
-	"gold_idol": {"name": "Golden Idol", "icon": 12, "stack": 5, "price": 200, "treasure": true},
+	"coin_purse": {"name": "Old Coin Purse", "icon": 9, "stack": 5, "price": 60, "treasure": true, "rarity": 1},
+	"compass": {"name": "Antique Compass", "icon": 10, "stack": 5, "price": 90, "treasure": true, "rarity": 2},
+	"gem": {"name": "River Gem", "icon": 11, "stack": 5, "price": 130, "treasure": true, "rarity": 2},
+	"gold_idol": {"name": "Golden Idol", "icon": 12, "stack": 5, "price": 200, "treasure": true, "rarity": 3},
 	"bow": {"name": "Hunting Bow", "icon": 15, "stack": 1, "price": 0, "key": true},
 	"tent": {"name": "Tent", "icon": 16, "stack": 1, "price": 0, "key": true},
 	"shovel": {"name": "Shovel", "icon": 14, "stack": 1, "price": 0, "key": true},
@@ -32,13 +32,60 @@ const ITEMS := {
 	"potato_baked": {"name": "Baked Potato", "icon": 24, "stack": 20, "price": 10, "food": 30},
 	"pumpkin": {"name": "Pumpkin", "icon": 25, "stack": 5, "price": 25, "food": 40},
 	"mushroom": {"name": "Wild Mushroom", "icon": 33, "stack": 20, "price": 3, "food": 6},
-	"spider_silk": {"name": "Spider Silk", "icon": 26, "stack": 20, "price": 12},
-	"wildcat_pelt": {"name": "Wildcat Pelt", "icon": 27, "stack": 5, "price": 25},
-	"bear_hide": {"name": "Bear Hide", "icon": 28, "stack": 5, "price": 60},
+	"spider_silk": {"name": "Spider Silk", "icon": 26, "stack": 20, "price": 12, "rarity": 1},
+	"wildcat_pelt": {"name": "Wildcat Pelt", "icon": 27, "stack": 5, "price": 25, "rarity": 1},
+	"bear_hide": {"name": "Bear Hide", "icon": 28, "stack": 5, "price": 60, "rarity": 2},
 	"bear_meat": {"name": "Bear Meat", "icon": 0, "stack": 10, "price": 8, "food": 12, "cook": "meat_cooked"},
 	"worms": {"name": "Worms", "icon": 31, "stack": 30, "price": 1},
 	"stone": {"name": "Smooth Stone", "icon": 32, "stack": 20, "price": 1},
+	# --- rare finds -------------------------------------------------------
+	"white_antler": {"name": "White Stag Antler", "icon": 34, "stack": 5, "price": 250, "rarity": 3},
+	"moose_antler": {"name": "Moose Antler", "icon": 35, "stack": 5, "price": 150, "rarity": 2},
+	"fox_pelt": {"name": "Red Fox Pelt", "icon": 36, "stack": 5, "price": 80, "rarity": 2},
+	"loon_feather": {"name": "Loon Feather", "icon": 37, "stack": 10, "price": 60, "rarity": 2},
+	"owl_feather": {"name": "Owl Feather", "icon": 38, "stack": 10, "price": 60, "rarity": 2},
+	"golden_trout": {"name": "Golden Trout", "icon": 39, "stack": 5, "price": 150, "food": 50, "rarity": 3},
+	"spirit_pearl": {"name": "Spirit Pearl", "icon": 40, "stack": 5, "price": 500, "rarity": 4},
+	"elder_claw": {"name": "Elder Bear Claw", "icon": 41, "stack": 5, "price": 400, "rarity": 4},
+	"rabbit_foot": {"name": "Lucky Rabbit's Foot", "icon": 42, "stack": 1, "price": 60, "rarity": 2,
+		"desc": "Carrying one doubles your chance of rare drops."},
+	"antler": {"name": "Deer Antler", "icon": 43, "stack": 10, "price": 25, "rarity": 1},
+	"wolf_fang": {"name": "Wolf Fang", "icon": 44, "stack": 10, "price": 20, "rarity": 1},
+	"amber": {"name": "Ancient Amber", "icon": 45, "stack": 10, "price": 90, "rarity": 2},
+	"wildcat_claw": {"name": "Wildcat Claw", "icon": 46, "stack": 10, "price": 30, "rarity": 1},
+	"bear_claw": {"name": "Bear Claw", "icon": 47, "stack": 10, "price": 45, "rarity": 1},
+	"bird_egg": {"name": "Bird Egg", "icon": 48, "stack": 10, "price": 8, "food": 15, "rarity": 1},
+	"golden_mushroom": {"name": "Golden Mushroom", "icon": 49, "stack": 10, "price": 70, "food": 25,
+		"heal": 35, "rarity": 2},
+	"arrowhead": {"name": "Ancient Arrowhead", "icon": 50, "stack": 10, "price": 40, "rarity": 1},
+	"old_coin": {"name": "Old Silver Coin", "icon": 51, "stack": 10, "price": 75, "rarity": 2},
+	"old_boot": {"name": "Soggy Old Boot", "icon": 52, "stack": 5, "price": 1, "rarity": 0},
 }
+
+## Rarity tiers: name and colour (used for item names, pickup sparkles).
+const RARITY_NAMES := ["Common", "Uncommon", "Rare", "Epic", "Legendary"]
+const RARITY_COLORS := [Color(0.95, 0.93, 0.86), Color(0.48, 0.89, 0.42), Color(0.37, 0.71, 1.0),
+	Color(0.78, 0.49, 1.0), Color(1.0, 0.81, 0.25)]
+
+## Chance-based extra drops, by source (animal kind or activity).
+## [item, chance]. A Lucky Rabbit's Foot in the party doubles every chance.
+const RARE_DROPS := {
+	"rabbit": [["rabbit_foot", 0.03]],
+	"deer": [["antler", 0.18]],
+	"wolf": [["wolf_fang", 0.25]],
+	"spider": [["amber", 0.06]],
+	"wildcat": [["wildcat_claw", 0.2]],
+	"bear": [["bear_claw", 0.35]],
+	"fox": [["rabbit_foot", 0.08]],
+	"chop": [["bird_egg", 0.05], ["amber", 0.012]],
+	"dig": [["arrowhead", 0.04], ["old_coin", 0.015]],
+	"forage": [["golden_mushroom", 0.035]],
+	"till": [["arrowhead", 0.02]],
+	"harvest": [["golden_mushroom", 0.01]],
+}
+
+## Fishing outcomes beyond a normal fish (rolled in order).
+const FISH_RARES := [["golden_trout", 0.035], ["bottle", 0.02], ["old_boot", 0.04]]
 
 ## Crops: seed item, harvested item, total grow time in in-game days.
 const CROPS := {
@@ -103,6 +150,14 @@ static func item(id: String) -> Dictionary:
 
 static func item_name(id: String) -> String:
 	return str(item(id).get("name", id))
+
+
+static func rarity(id: String) -> int:
+	return int(item(id).get("rarity", 0))
+
+
+static func rarity_color(id: String) -> Color:
+	return RARITY_COLORS[clampi(rarity(id), 0, RARITY_COLORS.size() - 1)]
 
 
 static func is_key(id: String) -> bool:

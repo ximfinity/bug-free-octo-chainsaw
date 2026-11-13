@@ -13,6 +13,8 @@ const MAX_DANGER := 4
 
 var main
 var _timer: float = 0.0
+var _rare_timer: float = 20.0
+const RARE_CHANCE := 0.22
 
 
 func _process(delta: float) -> void:
@@ -25,11 +27,14 @@ func _process(delta: float) -> void:
 	var prey: int = 0
 	var wolves: int = 0
 	var danger: int = 0
+	var rares: int = 0
 	for a in get_tree().get_nodes_in_group("animals"):
 		if a.position.distance_to(main.player.position) > DESPAWN_DIST:
 			a.queue_free()
 			continue
-		if a.kind == "wolf":
+		if a.is_rare():
+			rares += 1
+		elif a.kind == "wolf":
 			wolves += 1
 		elif a.is_predator():
 			danger += 1
@@ -41,6 +46,11 @@ func _process(delta: float) -> void:
 		_try_spawn(true)
 	if danger < MAX_DANGER and randf() < 0.5:
 		_try_spawn_danger()
+	_rare_timer -= 1.2
+	if rares == 0 and _rare_timer <= 0.0:
+		_rare_timer = randf_range(12.0, 24.0)
+		if randf() < RARE_CHANCE:
+			try_spawn_rare()
 
 
 func _try_spawn(predator: bool) -> void:
@@ -119,6 +129,76 @@ func _try_spawn_danger() -> void:
 			a.position = world.tile_center(t) + Vector2(randf_range(-24, 24), randf_range(-24, 24))
 			main.entities.add_child(a)
 		return
+
+
+## Picks a rare creature suited to a nearby tile, time of day and season of
+## the game. Returns the spawned animal (or null).
+func try_spawn_rare(force_kind: String = ""):
+	var world = main.world
+	var center: Vector2i = world.tile_at_pos(main.player.position)
+	var hour: float = main.day_night.time_of_day
+	var night: bool = main.day_night.is_night()
+	var dusk_dawn: bool = (hour >= 4.5 and hour < 8.5) or (hour >= 17.0 and hour < 21.5)
+	for _i in 24:
+		var ang: float = randf() * TAU
+		var r: float = randf_range(14, SPAWN_MAX)
+		var t := Vector2i(center.x + int(cos(ang) * r), center.y + int(sin(ang) * r))
+		if not world.in_bounds(t.x, t.y):
+			continue
+		var tt: int = world.get_tile(t.x, t.y)
+		var options: Array = []
+		match tt:
+			Tiles.GRASS, Tiles.MEADOW:
+				if dusk_dawn:
+					options.append(["fox", 6])
+			Tiles.BIRCH, Tiles.MAPLE:
+				if not night:
+					options.append(["white_stag", 1])
+				if night:
+					options.append(["owl", 4])
+				if main.day_night.day >= 3:
+					options.append(["elder_bear", 1])
+			Tiles.FOREST:
+				if night:
+					options.append(["owl", 4])
+				options.append(["moose", 2])
+				if main.day_night.day >= 3:
+					options.append(["elder_bear", 1])
+			Tiles.MARSH:
+				options.append(["moose", 5])
+			Tiles.RIVER:
+				if not night:
+					options.append(["otter", 6])
+			Tiles.DEEP:
+				options.append(["loon", 4])
+				if night:
+					options.append(["spirit", 2])
+			Tiles.SHALLOW:
+				options.append(["loon", 1])
+		if force_kind != "":
+			options = [[force_kind, 1]]
+		if options.is_empty():
+			continue
+		var total: int = 0
+		for o in options:
+			total += int(o[1])
+		var roll: int = randi_range(1, total)
+		var kind: String = options[0][0]
+		for o in options:
+			roll -= int(o[1])
+			if roll <= 0:
+				kind = o[0]
+				break
+		var a = AnimalScript.new()
+		a.kind = kind
+		a.main = main
+		a.position = world.tile_center(t)
+		if not a._can_stand_kind(a.position):
+			a.free()
+			continue
+		main.entities.add_child(a)
+		return a
+	return null
 
 
 ## Wolves slink away at dawn.

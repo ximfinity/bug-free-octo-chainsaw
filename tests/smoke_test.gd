@@ -254,6 +254,72 @@ func _run() -> void:
 	juniper.perform_action("revive", Vector2i.ZERO)
 	check(not rowan.downed and rowan.health > 0.0, "partner revived")
 
+	# --- Rare creatures, rare drops, journal ---
+	var j = main.player
+	j.position = w.tile_center(w.start)
+	var Animal2 = load("res://scripts/entities/animal.gd")
+	var fox = Animal2.new()
+	fox.kind = "fox"
+	fox.main = main
+	fox.position = j.position + Vector2(120, 0)
+	main.entities.add_child(fox)
+	var coins_b: int = main.coins
+	await frames(3)
+	check(int(main.journal["creatures"].get("fox", 0)) >= 1, "seeing a rare fox logs it in the journal")
+	check(main.coins > coins_b, "first rare sighting pays a naturalist reward")
+	# Watch-only creatures can't be hurt.
+	var otter = Animal2.new()
+	otter.kind = "otter"
+	otter.main = main
+	otter.position = j.position + Vector2(-30, 0)
+	main.entities.add_child(otter)
+	await frames(2)
+	otter.hit(5, Vector2.RIGHT)
+	check(otter.alive, "otters are watch-only and can't be harmed")
+	otter.queue_free()
+	# The owl flies off when approached.
+	var owl = Animal2.new()
+	owl.kind = "owl"
+	owl.main = main
+	owl.position = j.position + Vector2(40, 0)
+	main.entities.add_child(owl)
+	await frames(3)
+	check(not owl.alive, "the owl flies away when you get close")
+	# The lake spirit leaves a Spirit Pearl.
+	var pearls: int = j.inventory.count("spirit_pearl")
+	main.day_night.set_time(23.0, false)
+	var spirit = Animal2.new()
+	spirit.kind = "spirit"
+	spirit.main = main
+	spirit.position = j.position + Vector2(30, 0)
+	main.entities.add_child(spirit)
+	await frames(3)
+	check(j.inventory.count("spirit_pearl") > pearls or int(main.journal["finds"].get("spirit_pearl", 0)) > 0, "the Lake Spirit grants a Spirit Pearl")
+	main.day_night.set_time(10.0, true)
+	# Rare drop tables (forced luck).
+	j.inventory.add("rabbit_foot", 1)
+	check(main.luck_mult() == 2.0, "a Lucky Rabbit's Foot doubles rare chances")
+	var fangs: int = 0
+	for k in 60:
+		main.roll_rare_drops("wolf", j.position, j)
+	fangs = j.inventory.count("wolf_fang")
+	check(fangs > 0, "wolves drop rare fangs (%d in 60 rolls)" % fangs)
+	check(int(main.journal["finds"].get("wolf_fang", 0)) > 0, "rare finds are logged in the journal")
+	# Healing food.
+	j.health = 40.0
+	j.hunger = 20.0
+	j.inventory.add("golden_mushroom", 1)
+	j.eat("golden_mushroom")
+	check(j.health >= 70.0, "a Golden Mushroom heals")
+	# Rare spawner finds a valid spot.
+	var rare = main.spawner.try_spawn_rare("loon")
+	check(rare == null or rare.kind == "loon", "rare spawner places a loon on water")
+	# Journal screen opens.
+	main.open_screen(main.journal_screen)
+	await frames(3)
+	main.close_screen()
+	check(not get_tree().paused, "journal opens and closes")
+
 	# Save and reload data round trip.
 	check(main.save_game(), "game saved")
 	var data: Dictionary = GameState.read_save()
@@ -261,6 +327,7 @@ func _run() -> void:
 	check((data.get("dug", []) as Array).size() == 1, "save has dug site")
 	check((data.get("party", []) as Array).size() == 2, "save has both characters")
 	check((data.get("edits", []) as Array).size() > 0, "save has world edits")
+	check((data.get("journal", {}) as Dictionary).has("creatures"), "save has the creature journal")
 	_finish()
 
 

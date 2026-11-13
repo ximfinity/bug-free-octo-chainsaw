@@ -60,11 +60,11 @@ func refresh() -> void:
 	_build_services(p)
 
 
-func _row(icon_index: int, text: String) -> HBoxContainer:
+func _row(icon_index: int, text: String, color: Color = Color(0.95, 0.93, 0.86)) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	if icon_index >= 0:
 		row.add_child(UI.icon(icon_index, 16))
-	var l := UI.label(text, 10)
+	var l := UI.label(text, 10, color)
 	l.custom_minimum_size = Vector2(500, 0)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	row.add_child(l)
@@ -83,7 +83,7 @@ func _build_sell(p) -> void:
 			continue
 		any = true
 		var count: int = p.inventory.count(id)
-		var row := _row(int(info.get("icon", 12)), "%s x%d  -  %d each" % [info["name"], count, price])
+		var row := _row(int(info.get("icon", 12)), "%s x%d  -  %d each" % [info["name"], count, price], ItemDB.rarity_color(id))
 		var sid: String = id
 		row.add_child(UI.button("Sell 1", func(): _sell(sid, 1)))
 		row.add_child(UI.button("All", func(): _sell(sid, p.inventory.count(sid))))

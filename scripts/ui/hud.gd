@@ -161,13 +161,13 @@ func _draw_party() -> void:
 		party_panel.draw_string(font, Vector2(178, y + 18), status, HORIZONTAL_ALIGNMENT_LEFT, 80, 13, sc)
 
 
-func message(text: String) -> void:
+func message(text: String, color: Color = Color.WHITE) -> void:
 	# Don't repeat the same line back to back.
 	if messages.get_child_count() > 0:
 		var last := messages.get_child(messages.get_child_count() - 1) as Label
 		if last and last.text == text and last.modulate.a > 0.5:
 			return
-	var l := UI.outlined(text, 10)
+	var l := UI.outlined(text, 10, color)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	messages.add_child(l)
