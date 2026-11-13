@@ -309,6 +309,9 @@ func _run() -> void:
 	# Healing food.
 	j.health = 40.0
 	j.hunger = 20.0
+	j.digesting = 0.0
+	j.poison = 0.0
+	j.inventory.max_slots = 99
 	j.inventory.add("golden_mushroom", 1)
 	j.eat("golden_mushroom")
 	check(j.health >= 70.0, "a Golden Mushroom heals")
