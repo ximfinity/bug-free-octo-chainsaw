@@ -27,6 +27,11 @@ const StoreScreen = preload("res://scripts/ui/store_screen.gd")
 const PauseMenu = preload("res://scripts/ui/pause_menu.gd")
 const JournalScreen = preload("res://scripts/ui/journal_screen.gd")
 const RippleFX = preload("res://scripts/fx/ripple.gd")
+const LandmarkScript = preload("res://scripts/entities/landmark.gd")
+const AnimalScript = preload("res://scripts/entities/animal.gd")
+const Quests = preload("res://scripts/systems/quests.gd")
+const QuestDB = preload("res://scripts/data/quest_db.gd")
+const Dialogue = preload("res://scripts/ui/dialogue.gd")
 
 const STORE_REACH := 84.0
 const CAMP_REACH := 60.0
@@ -69,6 +74,18 @@ var stats: Dictionary = {"kills": 0, "treasures": 0}
 ## Creature Journal: kind -> times sighted; rare item id -> times found.
 var journal: Dictionary = {"creatures": {}, "finds": {}, "variants": {}}
 var respawn_point: Vector2 = Vector2.ZERO
+## Unique areas: id -> landmark node, plus their saved state.
+var landmarks: Dictionary = {}
+var places: Dictionary = {"found": {}, "ruins_left": 3}
+var quests
+var dialogue
+## Landmark id the trail currently points at ("" = none).
+var quest_mark: String = ""
+var _grove_cd: float = 0.0
+var _cam_lead: Vector2 = Vector2.ZERO
+var _toasts: Dictionary = {}
+var _toast_t: float = 0.0
+var _amb_t: float = 0.0
 
 var ui_layer: CanvasLayer
 var hud
@@ -193,6 +210,14 @@ func _build_world() -> void:
 	camera.make_current()
 	edits = WorldEdits.new()
 	edits.setup(world, flat_decor, tall_decor)
+	for lm in world.landmarks:
+		var node = LandmarkScript.new()
+		node.id = lm["id"]
+		node.tile = lm["tile"]
+		node.main = self
+		node.position = world.tile_center(lm["tile"])
+		entities.add_child(node)
+		landmarks[lm["id"]] = node
 	target_cursor = Node2D.new()
 	target_cursor.z_index = -9
 	target_cursor.draw.connect(_draw_cursor)
@@ -223,6 +248,12 @@ func _build_ui() -> void:
 	store_screen.main = self
 	store_screen.visible = false
 	ui_layer.add_child(store_screen)
+	dialogue = Dialogue.new()
+	dialogue.main = self
+	dialogue.visible = false
+	ui_layer.add_child(dialogue)
+	quests = Quests.new()
+	quests.setup(self)
 	journal_screen = JournalScreen.new()
 	journal_screen.main = self
 	journal_screen.visible = false
@@ -267,6 +298,8 @@ func _new_game() -> void:
 	kayak.set_state(KayakScript.State.PARKED)
 	respawn_point = player.position
 	day_night.time_of_day = 8.0
+	for i in 2:
+		party[i].set_char_name(GameState.char_names[i])
 	camera.position = player.position
 	camera.reset_smoothing()
 
@@ -301,8 +334,16 @@ func _process(delta: float) -> void:
 		_edit_timer = 2.0
 		edits.tick(game_days())
 	_partner_msg_cd -= delta
-	# Camera follows the active character (or the kayak they ride in).
-	camera.position = player.position
+	_grove_cd -= delta
+	quests.tick(delta)
+	_update_ambience(delta)
+	_flush_toasts(delta)
+	# Camera follows the active character, easing ahead while paddling.
+	var lead := Vector2.ZERO
+	if player.is_paddling():
+		lead = player.velocity * 0.45
+	_cam_lead = _cam_lead.lerp(lead, clampf(delta * 2.0, 0.0, 1.0))
+	camera.position = player.position + _cam_lead
 	if _shake > 0.0:
 		_shake -= delta
 		camera.offset = Vector2(randf_range(-1, 1), randf_range(-1, 1)) * 6.0 * (_shake / 0.3)
@@ -338,8 +379,11 @@ func open_screen(screen) -> void:
 
 
 func close_screen() -> void:
+	var was_store: bool = current_screen == store_screen and current_screen != null
 	if current_screen != null:
 		current_screen.visible = false
+	if was_store:
+		autosave.call_deferred()
 	current_screen = null
 	get_tree().paused = false
 
@@ -381,10 +425,11 @@ func on_rare_item(who, id: String) -> void:
 		var name_txt: String = ItemDB.item_name(id)
 		var whose: String = "" if (who == null or who.controlled) else " (%s)" % who.char_name
 		message("%s find: %s!%s" % [tag, name_txt, whose], ItemDB.rarity_color(id))
+		Sfx.play("rare" if r >= 2 else "chime", null, -4.0)
 		if r >= 2 and who != null:
 			_rare_burst(who.position, ItemDB.rarity_color(id))
 	elif who != null and who.controlled:
-		message("+1 %s" % ItemDB.item_name(id))
+		item_toast(id, 1)
 
 
 func journal_add_find(id: String) -> void:
@@ -430,6 +475,8 @@ func on_creature_sighted(a) -> void:
 		_rare_burst(a.position, vcol)
 	if not a.is_rare():
 		return
+	if in_grove(a.position) or in_grove(player.position):
+		quest_event("grove_sight")
 	var col: Color = ItemDB.RARITY_COLORS[3 if bool(a.data.get("boss", false)) or a.kind == "spirit" or a.kind == "white_stag" else 2]
 	if first:
 		var reward: int = int(a.data.get("reward", 50))
@@ -453,6 +500,7 @@ func on_char_tile_changed(c, t: Vector2i) -> void:
 	elif tt == Tiles.HILL:
 		r = REVEAL_HILL
 	exploration.reveal(t, r)
+	_check_discoveries()
 	for i in stores.size():
 		if not store_seen[i] and exploration.is_discovered(world.stores[i]):
 			store_seen[i] = true
@@ -477,11 +525,17 @@ func try_interact() -> void:
 		current_screen = store_screen
 		get_tree().paused = true
 		store_screen.open(si)
+		quest_event("visit_store", str(si))
 		get_viewport().set_input_as_handled()
 		return
 	if camp != null and player.position.distance_to(camp.fire_position()) < CAMP_REACH:
 		_camp_interact()
 		return
+	for id in landmarks:
+		var lm = landmarks[id]
+		if lm.prompt(player) != "":
+			lm.interact(player)
+			return
 	message("Nothing to interact with here.")
 
 
@@ -527,7 +581,7 @@ func available_actions() -> Array:
 		if near_camp:
 			if not camp.lit:
 				a.append(["interact", "Light fire"])
-			elif p.inventory.has("meat_raw") or p.inventory.has("fish_raw"):
+			elif has_raw_food(p):
 				a.append(["interact", "Cook"])
 			elif day_night.is_evening():
 				a.append(["interact", "Sleep"])
@@ -540,6 +594,12 @@ func available_actions() -> Array:
 			a.append(["shoot", "Shoot"])
 	if near_store and not p.is_carrying():
 		a.append(["interact", "Trade"])
+	elif not near_camp:
+		for lid in landmarks:
+			var lp: String = landmarks[lid].prompt(p)
+			if lp != "":
+				a.append(["interact", lp])
+				break
 	var other = partner_of(p)
 	if other != null:
 		a.append(["switch_character", "Play as %s" % other.char_name])
@@ -617,6 +677,16 @@ func is_in_safe_zone(pos: Vector2) -> bool:
 	for st in stores:
 		if pos.distance_to(st.position) < 110.0:
 			return true
+	for id in landmarks:
+		if landmarks[id].is_safe(pos):
+			return true
+	return false
+
+
+func has_raw_food(c) -> bool:
+	for id in c.inventory.counts:
+		if str(ItemDB.item(id).get("cook", "")) != "":
+			return true
 	return false
 
 
@@ -631,11 +701,11 @@ func _camp_interact() -> void:
 			message("You need %d firewood to light the fire." % CampScript.WOOD_TO_LIGHT)
 		return
 	var cooked: int = 0
-	for raw in ["meat_raw", "fish_raw"]:
+	for raw in inv.counts.keys():
 		var n: int = inv.count(raw)
-		if n <= 0:
+		var target: String = str(ItemDB.item(raw).get("cook", ""))
+		if n <= 0 or target == "":
 			continue
-		var target: String = ItemDB.item(raw).get("cook", "")
 		inv.remove(raw, n)
 		var added: int = inv.add(target, n)
 		if added < n:
@@ -643,14 +713,21 @@ func _camp_interact() -> void:
 		cooked += added
 	if cooked > 0:
 		message("You cook %d pieces of food over the fire." % cooked)
+		quest_event("cook", "", cooked)
+		Sfx.play("fire", camp.fire_position())
 		return
 	if day_night.is_evening():
-		_sleep()
+		sleep_now(false)
 	else:
 		message("The fire is warm. Sleep here once evening comes.")
 
 
 func _sleep() -> void:
+	sleep_now(false)
+
+
+## Sleep until dawn: by the campfire, or in the Old Paddler's cabin.
+func sleep_now(at_cabin: bool) -> void:
 	get_tree().paused = true
 	var tw := create_tween()
 	tw.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
@@ -660,6 +737,8 @@ func _sleep() -> void:
 		day_night.set_time(6.0, next_day)
 		for c in party:
 			var near_fire: bool = camp != null and c.position.distance_to(camp.fire_position()) < CampScript.SAFE_RADIUS * 1.5
+			if at_cabin and is_in_safe_zone(c.position):
+				near_fire = true
 			c.health = minf(100.0, c.health + (40.0 if near_fire else 10.0))
 			c.stamina = 100.0
 			c.hunger = maxf(0.0, c.hunger - 20.0)
@@ -667,6 +746,7 @@ func _sleep() -> void:
 		spawner.clear_wolves()
 		if camp != null:
 			camp.set_lit(false)
+		quest_event("sleep")
 		save_game())
 	tw.tween_interval(0.6)
 	tw.tween_property(fade, "color:a", 0.0, 0.8)
@@ -679,8 +759,19 @@ func _on_night() -> void:
 	message("Night falls. Stay close to a lit campfire!")
 
 
+## Saves quietly and shows a small confirmation.
+func autosave() -> void:
+	if not ready_done or player == null or player.dead:
+		return
+	if save_game():
+		message("Game saved.", Color(0.7, 0.8, 0.75))
+
+
 func _on_morning() -> void:
 	spawner.on_morning()
+	for id in landmarks:
+		landmarks[id].on_morning()
+	autosave.call_deferred()
 	if camp != null and camp.lit:
 		camp.set_lit(false)
 		message("Dawn breaks. Your campfire burns down to embers.")
@@ -743,6 +834,7 @@ func dig_at(pos: Vector2, digger = null) -> void:
 	if digger.inventory.add(loot, 1) == 0:
 		spawn_pickup(loot, 1, pos)
 	journal_add_find(loot)
+	Sfx.play("coin", pos)
 	message("Treasure! You found a %s and %d coins." % [ItemDB.item_name(loot), bonus], ItemDB.rarity_color(loot))
 	_chest_effect(world.tile_center(tile))
 
@@ -840,7 +932,7 @@ func reveal_treasure_near(from_tile: Vector2i) -> bool:
 
 # ------------------------------------------------------------- kayak help
 func kayak_far_from_store(i: int) -> bool:
-	if player.is_paddling() or player.is_carrying():
+	if player.is_paddling() or player.is_carrying() or not kayak.riders.is_empty():
 		return false
 	var dock: Vector2 = world.tile_center(world.store_docks[i])
 	return kayak.position.distance_to(dock) > 10.0 * 32.0
@@ -860,6 +952,238 @@ func spawn_pickup(id: String, amount: int, pos: Vector2) -> void:
 
 
 # ------------------------------------------------------------ death/respawn
+# ------------------------------------------------------------ game feel
+## Pickups of the same item within a moment are announced as one line.
+func item_toast(id: String, n: int) -> void:
+	_toasts[id] = int(_toasts.get(id, 0)) + n
+	if _toast_t <= 0.0:
+		_toast_t = 0.6
+
+
+func _flush_toasts(delta: float) -> void:
+	if _toasts.is_empty():
+		return
+	_toast_t -= delta
+	if _toast_t > 0.0:
+		return
+	var parts := PackedStringArray()
+	for id in _toasts:
+		parts.append("+%d %s" % [int(_toasts[id]), ItemDB.item_name(id)])
+	_toasts.clear()
+	message(", ".join(parts))
+
+
+## Floating number that rises and fades.
+func damage_number(at: Vector2, amount: int, color: Color) -> void:
+	if amount <= 0:
+		return
+	var l := Label.new()
+	l.text = str(amount)
+	l.add_theme_font_size_override("font_size", 18)
+	l.add_theme_color_override("font_color", color)
+	l.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.13))
+	l.add_theme_constant_override("outline_size", 6)
+	l.position = at + Vector2(randf_range(-10, 4), 0)
+	l.z_index = 20
+	var mat := CanvasItemMaterial.new()
+	mat.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
+	l.material = mat
+	add_child(l)
+	var tw := l.create_tween()
+	tw.tween_property(l, "position:y", l.position.y - 30.0, 0.6)
+	tw.parallel().tween_property(l, "modulate:a", 0.0, 0.6).set_delay(0.25)
+	tw.tween_callback(l.queue_free)
+
+
+## A blink of slow motion when a melee hit lands.
+func hit_stop() -> void:
+	if Engine.time_scale < 1.0:
+		return
+	Engine.time_scale = 0.15
+	_shake = maxf(_shake, 0.12)
+	get_tree().create_timer(0.08, true, false, true).timeout.connect(func(): Engine.time_scale = 1.0)
+
+
+func dust(at: Vector2) -> void:
+	var p := CPUParticles2D.new()
+	p.position = at
+	p.z_index = -6
+	p.texture = Art.dot_texture()
+	p.amount = 3
+	p.one_shot = true
+	p.explosiveness = 1.0
+	p.lifetime = 0.35
+	p.direction = Vector2(0, -1)
+	p.spread = 60.0
+	p.initial_velocity_min = 8.0
+	p.initial_velocity_max = 20.0
+	p.gravity = Vector2.ZERO
+	p.color = Color(0.85, 0.8, 0.65, 0.5)
+	p.emitting = true
+	add_child(p)
+	get_tree().create_timer(0.6, false).timeout.connect(p.queue_free)
+
+
+## A little icon that pops above a character (wave, etc).
+func emote(c, kind: String) -> void:
+	var s := Sprite2D.new()
+	s.texture = Art.prop(Art.HEART if kind == "wave" else Art.ALERT)
+	s.scale = Vector2(0.45, 0.45)
+	s.position = Vector2(0, -78)
+	c.add_child(s)
+	var tw := s.create_tween()
+	tw.tween_property(s, "position:y", -92.0, 0.5)
+	tw.tween_interval(0.5)
+	tw.tween_property(s, "modulate:a", 0.0, 0.3)
+	tw.tween_callback(s.queue_free)
+	if kind == "wave":
+		partner_message(c, "%s waves hello." % c.char_name)
+
+
+## Ambience follows where you are: water, daytime birds, night crickets, falls.
+func _update_ambience(delta: float) -> void:
+	_amb_t -= delta
+	if _amb_t > 0.0:
+		return
+	_amb_t = 0.5
+	var t: Vector2i = world.tile_at_pos(player.position)
+	var wet: int = 0
+	for dy in range(-4, 5, 2):
+		for dx in range(-4, 5, 2):
+			if Tiles.is_water(world.get_tile(t.x + dx, t.y + dy)):
+				wet += 1
+	var water: float = clampf(wet / 12.0, 0.0, 1.0)
+	var night: float = clampf(day_night.darkness() * 1.2, 0.0, 1.0)
+	var falls: float = 0.0
+	if landmarks.has("falls"):
+		falls = clampf(1.0 - player.position.distance_to(landmarks["falls"].position) / 500.0, 0.0, 1.0)
+	Sfx.set_ambience(water * 0.8, (1.0 - night) * 0.7, night * 0.8, falls)
+
+
+# ------------------------------------------------- places and the trail
+func _check_discoveries() -> void:
+	var found: Dictionary = places["found"]
+	for lm in world.landmarks:
+		var id: String = lm["id"]
+		if found.has(id) or not exploration.is_discovered(lm["tile"]):
+			continue
+		# Being told where a place is doesn't count: someone must be near.
+		var near_someone := false
+		for c in party:
+			if c.position.distance_to(world.tile_center(lm["tile"])) < 32.0 * 12:
+				near_someone = true
+		if not near_someone:
+			continue
+		found[id] = true
+		coins += 40
+		if ready_done:
+			message("Discovered: %s!  (+40 coins)" % lm["name"], ItemDB.RARITY_COLORS[4])
+			Sfx.play("quest")
+			_rare_burst(player.position, ItemDB.RARITY_COLORS[4])
+		quest_event("discover_place", id)
+
+
+## Shows a landmark's location on the map (the Old Paddler's trail notes).
+func mark_landmark(id: String) -> void:
+	quest_mark = id
+	var lm: Dictionary = world.landmark(id)
+	if not lm.is_empty() and exploration != null:
+		exploration.reveal(lm["tile"], 3)
+
+
+func quest_event(kind: String, id: String = "", n: int = 1) -> void:
+	if quests != null:
+		quests.event(kind, id, n)
+
+
+func on_quest_step_done(st: Dictionary, reward_text: String) -> void:
+	quest_mark = ""
+	message("Trail step complete: %s!  Reward: %s" % [st["title"], reward_text], ItemDB.RARITY_COLORS[4])
+	Sfx.play("quest")
+	_rare_burst(player.position, ItemDB.RARITY_COLORS[4])
+	if not quests.is_complete():
+		message("Next: %s" % quests.current()["title"], Color(1.0, 0.92, 0.6))
+	autosave.call_deferred()
+
+
+func party_has(id: String) -> bool:
+	for c in party:
+		if c.inventory.has(id):
+			return true
+	return false
+
+
+func talk_to(who: String) -> void:
+	var lines: Array = []
+	var done := Callable()
+	var speaker: String = "Old Paddler"
+	var cell: int = Art.LM_NPC_PADDLER
+	if who == "keeper":
+		speaker = "Lighthouse Keeper"
+		cell = Art.LM_NPC_KEEPER
+		lines = QuestDB.TALK["keeper"]
+	else:
+		var sid: String = quests.current_id()
+		var has_tokens := true
+		for t in QuestDB.TOKENS:
+			if not party_has(t):
+				has_tokens = false
+		if sid == "cabin":
+			lines = QuestDB.TALK["paddler_intro"]
+			done = func(): quest_event("talk", "paddler")
+		elif sid == "headwaters" and has_tokens:
+			lines = QuestDB.TALK["paddler_final"]
+			done = func(): quest_event("talk", "paddler_final")
+		elif sid == "headwaters":
+			lines = ["You're missing a token or two. The lighthouse, the ruins and the falls each hold one."]
+		elif quests.is_complete():
+			lines = ["Good to see that paddle on the water again. Sleep here whenever you like."]
+		else:
+			lines = [str(quests.current().get("text", "")), QuestDB.TALK["paddler_idle"][0]]
+	current_screen = dialogue
+	get_tree().paused = true
+	dialogue.visible = true
+	dialogue.start(speaker, cell, lines, done)
+
+
+## The Elder Bear lives at Bear's Hollow until it is defeated.
+func ensure_elder_bear(at: Vector2) -> void:
+	for a in get_tree().get_nodes_in_group("animals"):
+		if a.kind == "elder_bear" and a.alive:
+			return
+	var b = AnimalScript.new()
+	b.kind = "elder_bear"
+	b.variant = 0
+	b.main = self
+	b.position = at
+	entities.add_child(b)
+
+
+func on_animal_defeated(a) -> void:
+	if a.kind == "elder_bear":
+		places["bear_defeated"] = true
+	quest_event("defeat", a.kind)
+
+
+func in_grove(pos: Vector2) -> bool:
+	return landmarks.has("grove") and pos.distance_to(landmarks["grove"].position) < LandmarkScript.GROVE_RADIUS
+
+
+## While the grove step is active, a rare creature is sure to turn up.
+func on_enter_grove(grove) -> void:
+	if quests.current_id() != "grove" or _grove_cd > 0.0:
+		return
+	_grove_cd = 20.0
+	for a in get_tree().get_nodes_in_group("animals"):
+		if a.is_rare() and a.alive and a.position.distance_to(grove.position) < 400.0:
+			return
+	var a2 = AnimalScript.new()
+	a2.kind = "owl" if day_night.is_night() else "fox"
+	a2.main = self
+	a2.position = grove.position + Vector2(randf_range(-60, 60), -70)
+	entities.add_child(a2)
+
+
 # --------------------------------------------------------------- party
 func partner_of(c):
 	for o in party:
@@ -880,6 +1204,8 @@ func switch_character() -> void:
 	if next.downed:
 		message("%s is knocked out - get to them and hold Space to revive." % next.char_name)
 		return
+	if player.is_carrying():
+		player.try_carry()
 	player.controlled = false
 	player._cancel_tool()
 	player.velocity = Vector2.ZERO
@@ -898,6 +1224,7 @@ func switch_character() -> void:
 		next.position = kayak.position
 		next.heading = kayak.heading
 	message("You are now playing as %s." % next.char_name)
+	quest_event("switch", str(next.who))
 
 
 ## Ask the partner to come to you (T).
@@ -984,6 +1311,8 @@ func switch_character_forced(next) -> void:
 	active_index = party.find(next)
 	if next.is_paddling():
 		kayak.set_state(KayakScript.State.OCCUPIED)
+	elif kayak.state == KayakScript.State.OCCUPIED:
+		kayak.set_state(KayakScript.State.PARKED)
 
 
 func chop_swing_fx(t: Vector2i) -> void:
@@ -1007,7 +1336,6 @@ func chop_swing_fx(t: Vector2i) -> void:
 	p.emitting = true
 	entities.add_child(p)
 	get_tree().create_timer(1.0, false).timeout.connect(p.queue_free)
-	tall_decor.modulate = Color(1, 1, 1)
 
 
 ## A tree topples over as it's felled.
@@ -1111,6 +1439,9 @@ func save_game() -> bool:
 		"respawn": [respawn_point.x, respawn_point.y],
 		"stats": stats,
 		"journal": journal,
+		"places": places,
+		"quests": quests.to_dict(),
+		"names": [party[0].char_name, party[1].char_name],
 	}
 	if camp != null:
 		d["camp"] = {"pos": [camp.position.x, camp.position.y], "lit": camp.lit}
@@ -1184,6 +1515,21 @@ func _apply_save(d: Dictionary) -> void:
 	var st = d.get("stats", {})
 	if st is Dictionary:
 		stats = st
+	var pl = d.get("places", {})
+	if pl is Dictionary:
+		places = pl
+		if not places.has("found"):
+			places["found"] = {}
+		places["ruins_left"] = int(places.get("ruins_left", 3))
+	var qd = d.get("quests", {})
+	if qd is Dictionary:
+		quests.from_dict(qd)
+	var nm = d.get("names", [])
+	if nm is Array and (nm as Array).size() == 2:
+		for i in 2:
+			party[i].set_char_name(str(nm[i]))
+	if bool(places.get("falls_open", false)) and landmarks.has("falls"):
+		(landmarks["falls"].extra as Sprite2D).texture = Art.landmark(Art.LM_CHEST_OPEN)
 	var jr = d.get("journal", {})
 	if jr is Dictionary:
 		journal = {"creatures": jr.get("creatures", {}), "finds": jr.get("finds", {}),

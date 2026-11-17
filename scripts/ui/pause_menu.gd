@@ -34,6 +34,20 @@ func _ready() -> void:
 	content.add_child(UI.button("Save & Quit to Title", func():
 		main.save_game()
 		GameState.quit_to_title()))
+	var vol_row := HBoxContainer.new()
+	content.add_child(vol_row)
+	vol_row.add_child(UI.label("Volume", 9))
+	var slider := HSlider.new()
+	slider.min_value = 0.0
+	slider.max_value = 1.0
+	slider.step = 0.05
+	slider.value = db_to_linear(AudioServer.get_bus_volume_db(0))
+	slider.custom_minimum_size = Vector2(300, 24)
+	slider.value_changed.connect(func(v: float):
+		AudioServer.set_bus_volume_db(0, linear_to_db(maxf(v, 0.0001)))
+		GameState.save_settings()
+		Sfx.play("click"))
+	vol_row.add_child(slider)
 	content.add_child(HSeparator.new())
 	content.add_child(UI.label("Tip: the bar at the bottom of the screen always shows what you can do.", 8, Color(1.0, 0.9, 0.6)))
 	controls_label = UI.label(CONTROLS, 8, Color(0.85, 0.85, 0.8))

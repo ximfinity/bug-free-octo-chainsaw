@@ -87,12 +87,14 @@ func _run() -> void:
 	p.position = w.tile_center(w.start)
 	p.inventory.add("wood", 6)
 	p.inventory.add("meat_raw", 2)
+	p.inventory.add("potato", 1)
 	main.toggle_camp()
 	check(main.camp != null, "camp pitched")
 	check(main.camp != null and main.camp.lit, "fire lit with wood")
 	check(main.is_in_safe_zone(p.position), "player safe by the fire")
 	main._camp_interact()
 	check(p.inventory.count("meat_cooked") == 2, "cooked meat at the fire")
+	check(p.inventory.count("potato_baked") == 1, "potatoes bake at the fire too")
 	p.eat_best()
 	check(p.inventory.count("meat_cooked") == 1 or p.hunger >= 98.0, "ate food")
 
@@ -351,6 +353,92 @@ func _run() -> void:
 	main.close_screen()
 	check(not get_tree().paused, "journal opens and closes")
 
+	# --- v6: review fixes, unique areas, story trail, sound ---
+	_unseat_all()
+	j = main.party[0]
+	var rw = main.party[1]
+	if main.player != j:
+		main.switch_character()
+	check(Sfx._stream("coin") != null, "sound effects load")
+	Sfx.play("coin")
+	# Idle partners can't starve or freeze to death.
+	rw.health = 20.0
+	rw.hunger = 0.0
+	rw._update_survival(30.0)
+	check(rw.health >= 15.0 and not rw.downed, "a waiting partner can't starve to death")
+	rw.health = 100.0
+	rw.hunger = 80.0
+	# The kayak shuttle is off while someone sits in the kayak.
+	main.kayak.position = w.tile_center(w.start_water) + Vector2(4000, 0)
+	rw._enter_kayak(main.kayak.position)
+	check(not main.kayak_far_from_store(0), "kayak shuttle is disabled while a partner is aboard")
+	_unseat_all()
+	main.kayak.position = w.tile_center(w.start_water)
+	rw.position = w.tile_center(w.start)
+	# Unique areas.
+	check(main.landmarks.size() == 7, "all 7 unique areas exist in the world")
+	var lh = main.landmarks["lighthouse"]
+	var seen_before: int = main.exploration.discovered_count
+	j.position = lh.position + Vector2(20, 20)
+	lh.interact(j)
+	await frames(2)
+	main.close_screen()
+	check(main.exploration.discovered_count > seen_before + 500, "climbing the lighthouse reveals the map")
+	check(bool(main.places.get("lighthouse_climbed", false)), "lighthouse climb is remembered")
+	var sp = main.landmarks["springs"]
+	j.position = sp.position + Vector2(-22, -8)
+	j.health = 50.0
+	await get_tree().create_timer(1.0).timeout
+	check(j.health > 50.5, "soaking in the hot springs heals (%.1f)" % j.health)
+	check(main.is_in_safe_zone(j.position), "the hot springs are a safe, warm place")
+	var ru = main.landmarks["ruins"]
+	ru.interact(j)
+	check(j.inventory.has("stone_tablet") and int(main.places["ruins_left"]) == 2, "diving at the ruins finds a relic")
+	var fa = main.landmarks["falls"]
+	var coins_f: int = main.coins
+	fa.interact(j)
+	check(main.coins >= coins_f + 150 and bool(main.places["falls_open"]), "the cove chest behind the falls opens")
+	var ho = main.landmarks["hollow"]
+	j.position = ho.position + Vector2(0, 60)
+	await get_tree().create_timer(0.3).timeout
+	main.ensure_elder_bear(ho.position + Vector2(0, 44))
+	var bears: int = 0
+	for a in get_tree().get_nodes_in_group("animals"):
+		if a.kind == "elder_bear" and a.alive:
+			bears += 1
+			a.queue_free()
+	check(bears == 1, "the Elder Bear lives at Bear's Hollow (and only one)")
+	j.position = w.tile_center(w.start)
+	await frames(3)
+	# Story trail: drive every step through its goals.
+	var QuestDB = load("res://scripts/data/quest_db.gd")
+	var guard: int = 0
+	while not main.quests.is_complete() and guard < 40:
+		guard += 1
+		var st: Dictionary = main.quests.current()
+		for g in st["goals"]:
+			if main.quests.is_complete() or main.quests.current() != st:
+				break
+			if g["kind"] == "have":
+				j.inventory.add(str(g["id"]), int(g["n"]))
+				main.quests.tick(1.0)
+			else:
+				main.quest_event(str(g["kind"]), str(g.get("id", "")), int(g["n"]))
+	check(main.quests.is_complete(), "the story trail can be completed (%d/%d steps)" % [main.quests.step, QuestDB.STEPS.size()])
+	check(main.paddle_level == 3, "finishing the trail awards the Founder's Paddle")
+	check(main.party_has("token_light") and main.party_has("token_ruin") and main.party_has("token_falls"), "trail tokens were awarded")
+	main.talk_to("paddler")
+	await frames(2)
+	check(main.current_screen == main.dialogue, "talking opens the dialogue panel")
+	main.close_screen()
+	main.open_screen(main.journal_screen)
+	main.journal_screen._set_tab(0)
+	await frames(2)
+	main.journal_screen._set_tab(2)
+	await frames(2)
+	main.close_screen()
+	Engine.time_scale = 1.0
+
 	# Save and reload data round trip.
 	check(main.save_game(), "game saved")
 	var data: Dictionary = GameState.read_save()
@@ -360,6 +448,8 @@ func _run() -> void:
 	check((data.get("edits", []) as Array).size() > 0, "save has world edits")
 	check((data.get("journal", {}) as Dictionary).has("creatures"), "save has the creature journal")
 	check((data.get("journal", {}) as Dictionary).has("variants"), "save has journal variant entries")
+	check(int((data.get("quests", {}) as Dictionary).get("step", -1)) == 14, "save has trail progress")
+	check((data.get("places", {}) as Dictionary).has("found"), "save has discovered places")
 	_finish()
 
 

@@ -28,7 +28,7 @@ const KINDS := {
 	"wildcat": {"hp": 4, "speed": 55.0, "chase": 120.0, "lunge": 420.0, "damage": 15.0, "swim": 0,
 		"aggro": 5.0, "stealth": true, "drops": [["wildcat_pelt", 1, 1], ["meat_raw", 1, 1]], "predator": true},
 	"bear": {"hp": 10, "speed": 40.0, "chase": 125.0, "lunge": 260.0, "damage": 30.0, "swim": 1,
-		"aggro": 3.0, "windup": 0.75, "drops": [["bear_hide", 1, 1], ["bear_meat", 2, 3]], "predator": true},
+		"aggro": 3.0, "windup": 0.9, "drops": [["bear_hide", 1, 1], ["bear_meat", 2, 3]], "predator": true},
 	# --- rare creatures (logged in the Creature Journal) -----------------
 	"white_stag": {"hp": 3, "speed": 60.0, "flee_speed": 205.0, "swim": 0, "rare": true, "flee": 230.0,
 		"drops": [["white_antler", 1, 1], ["meat_raw", 2, 3]], "reward": 200},
@@ -365,6 +365,7 @@ func _predator(delta: float) -> float:
 			dir = to_t.normalized()
 			if to_t.length() < (64.0 if kind != "bear" else 80.0):
 				_set_state("windup")
+				Sfx.play("growl" if kind == "bear" or kind == "elder_bear" or kind == "moose" else "alert", position, -4.0)
 			return float(data["chase"])
 		"windup":
 			alert.visible = int(_state_t * 10.0) % 2 == 0
@@ -475,6 +476,8 @@ func hit(damage: int, from_dir: Vector2, knockback: float = 6.0, attacker = null
 	hp -= damage
 	_flash = 0.15
 	_flee_timer = 3.0
+	main.damage_number(position + Vector2(0, -40), damage, Color(1.0, 0.9, 0.5))
+	Sfx.play("hit", position)
 	_step(from_dir * knockback)
 	hp_bar.queue_redraw()
 	if is_predator():
@@ -496,6 +499,7 @@ func _die() -> void:
 		if amount > 0:
 			main.spawn_pickup(d[0], amount, position + Vector2(randf_range(-12, 12), randf_range(-8, 8)))
 	main.roll_rare_drops(kind, position)
+	main.on_animal_defeated(self)
 	if variant > 0:
 		main.spawn_pickup(ItemDB.VARIANT_TROPHY[variant], 1, position + Vector2(0, -6))
 

@@ -49,7 +49,7 @@ func _process(delta: float) -> void:
 	_rare_timer -= 1.2
 	if rares == 0 and _rare_timer <= 0.0:
 		_rare_timer = randf_range(12.0, 24.0)
-		if randf() < RARE_CHANCE:
+		if randf() < RARE_CHANCE * (3.0 if main.in_grove(main.player.position) else 1.0):
 			try_spawn_rare()
 
 
@@ -100,7 +100,8 @@ func _try_spawn_danger() -> void:
 		var ang: float = randf() * TAU
 		var r: float = randf_range(SPAWN_MIN + 2, SPAWN_MAX + 4)
 		var t := Vector2i(center.x + int(cos(ang) * r), center.y + int(sin(ang) * r))
-		if not world.in_bounds(t.x, t.y) or main.is_in_safe_zone(world.tile_center(t)):
+		if not world.in_bounds(t.x, t.y) or main.is_in_safe_zone(world.tile_center(t)) \
+				or main.in_grove(world.tile_center(t)):
 			continue
 		var tt: int = world.get_tile(t.x, t.y)
 		var kind: String = ""
@@ -121,7 +122,9 @@ func _try_spawn_danger() -> void:
 					kind = "wildcat"
 		if kind == "":
 			continue
-		var count: int = randi_range(2, 3) if kind == "spider" else 1
+		var count: int = 1
+		if kind == "spider":
+			count = 3 if night else 2
 		for k in count:
 			var a = AnimalScript.new()
 			a.kind = kind
@@ -156,14 +159,10 @@ func try_spawn_rare(force_kind: String = ""):
 					options.append(["white_stag", 1])
 				if night:
 					options.append(["owl", 4])
-				if main.day_night.day >= 3:
-					options.append(["elder_bear", 1])
 			Tiles.FOREST:
 				if night:
 					options.append(["owl", 4])
 				options.append(["moose", 2])
-				if main.day_night.day >= 3:
-					options.append(["elder_bear", 1])
 			Tiles.MARSH:
 				options.append(["moose", 5])
 			Tiles.RIVER:

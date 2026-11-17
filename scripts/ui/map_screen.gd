@@ -112,6 +112,25 @@ func _draw() -> void:
 		var kp: Vector2 = o + main.kayak.position / 32.0 * s
 		draw_circle(kp, 7.0, Color.BLACK)
 		draw_circle(kp, 5.0, Color(1.0, 0.85, 0.2))
+	for lm in w.landmarks:
+		var lp: Vector2 = o + (Vector2(lm["tile"]) + Vector2(0.5, 0.5)) * s
+		var known: bool = bool(main.places.get("found", {}).get(lm["id"], false))
+		if known:
+			draw_circle(lp, 7.0, Color.BLACK)
+			draw_circle(lp, 5.0, Color(0.37, 0.9, 0.85))
+			draw_string_outline(font, lp + Vector2(10, 5), str(lm["name"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, 5, Color.BLACK)
+			draw_string(font, lp + Vector2(10, 5), str(lm["name"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.7, 1.0, 0.95))
+		if main.quest_mark == lm["id"]:
+			var pr: float = 12.0 + 4.0 * sin(Time.get_ticks_msec() / 200.0)
+			draw_arc(lp, pr, 0.0, TAU, 28, Color(1.0, 0.81, 0.25), 3.0)
+			if not known:
+				draw_string_outline(font, lp + Vector2(16, 5), "Trail: look here", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, 5, Color.BLACK)
+				draw_string(font, lp + Vector2(16, 5), "Trail: look here", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(1.0, 0.9, 0.5))
+	var other = main.partner_of(main.player)
+	if other != null and not (other.is_paddling() and main.player.is_paddling()):
+		var op: Vector2 = o + other.position / 32.0 * s
+		draw_circle(op, 7.0, Color.BLACK)
+		draw_circle(op, 5.0, Color(0.45, 0.9, 0.45))
 	var pp: Vector2 = o + main.player.position / 32.0 * s
 	var blink: bool = int(Time.get_ticks_msec() / 400) % 2 == 0
 	draw_circle(pp, 8.0, Color.BLACK)

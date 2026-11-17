@@ -332,8 +332,176 @@ static func generate(seed_value: int, w: int = 448, h: int = 448) -> WorldData:
 	wd.tiles = tiles
 	wd.flow = flow
 	_place_points_of_interest(wd, rng)
+	_place_landmarks(wd, rng)
 	_place_decor(wd, moist)
 	return wd
+
+
+const LANDMARK_NAMES := {
+	"cabin": "Old Paddler's Cabin", "lighthouse": "Lighthouse Point", "springs": "Hot Springs",
+	"ruins": "Sunken Ruins", "grove": "Whispering Grove", "falls": "Thunder Falls",
+	"hollow": "Bear's Hollow",
+}
+const LANDMARK_ORDER := ["cabin", "lighthouse", "springs", "ruins", "grove", "falls", "hollow"]
+const LANDMARK_CLEAR := {"cabin": 3, "lighthouse": 2, "springs": 2, "ruins": 3, "grove": 4, "falls": 1, "hollow": 2}
+
+
+static func _is_rock(t: int) -> bool:
+	return t == Tiles.MOUNTAIN or t == Tiles.SNOW
+
+
+## Counts tiles within `r` of (x, y) whose type has table[type] == 1.
+static func _count_around(wd: WorldData, x: int, y: int, r: int, table: Array) -> int:
+	var n: int = 0
+	for dy in range(-r, r + 1):
+		for dx in range(-r, r + 1):
+			var t: int = wd.get_tile(x + dx, y + dy)
+			if t < table.size() and table[t] == 1:
+				n += 1
+	return n
+
+
+## Places one of each unique area. Only land-to-land and lake-to-lake tile
+## changes are made, so the water network stays connected.
+static func _place_landmarks(wd: WorldData, rng: RandomNumberGenerator) -> void:
+	var w: int = wd.width
+	var h: int = wd.height
+	var m: int = 6
+	# Candidate lists gathered in one pass.
+	var shore: Array = []       # dry shoreline land next to a lake
+	var rocky: Array = []       # open highland
+	var bay: Array = []         # shallow water surrounded by lake
+	var forest: Array = []      # deep forest
+	var falls_a: Array = []     # river below a cliff
+	var falls_b: Array = []     # any water below a cliff
+	var cave: Array = []        # dry land below a cliff
+	var full: int = 25
+	for y in range(m, h - m):
+		for x in range(m, w - m):
+			var t: int = wd.tiles[y * w + x]
+			var north: int = wd.tiles[(y - 1) * w + x]
+			if Tiles.kayak_ok(t) and t != Tiles.MARSH:
+				if _is_rock(north):
+					if t == Tiles.RIVER:
+						falls_a.append(Vector2i(x, y))
+					else:
+						falls_b.append(Vector2i(x, y))
+				if t == Tiles.SHALLOW and (x + y) % 2 == 0 and _count_around(wd, x, y, 2, Tiles.LAKE_WATER) == full:
+					bay.append(Vector2i(x, y))
+				continue
+			if not Tiles.walk_ok(t) or t == Tiles.SHALLOW or t == Tiles.MARSH:
+				continue
+			if _is_rock(north) and _count_around(wd, x, y + 1, 1, Tiles.DIGGABLE) == 9:
+				cave.append(Vector2i(x, y))
+			if (x + y) % 2 == 1:
+				continue
+			if t == Tiles.SAND or t == Tiles.GRASS or t == Tiles.MEADOW or Tiles.is_forest(t):
+				if Tiles.LAKE_WATER[wd.tiles[y * w + x - 1]] == 1 or Tiles.LAKE_WATER[wd.tiles[y * w + x + 1]] == 1 \
+						or Tiles.LAKE_WATER[wd.tiles[(y - 1) * w + x]] == 1 or Tiles.LAKE_WATER[wd.tiles[(y + 1) * w + x]] == 1:
+					shore.append(Vector2i(x, y))
+			if (t == Tiles.ROCKY or t == Tiles.HILL) and _count_around(wd, x, y, 2, Tiles.DIGGABLE) == full:
+				rocky.append(Vector2i(x, y))
+			if Tiles.is_forest(t) and _count_around(wd, x, y, 3, Tiles.FORESTS) >= 45:
+				forest.append(Vector2i(x, y))
+	var any_land: Array = shore + rocky + forest
+	var start := Vector2(wd.start)
+	for id in LANDMARK_ORDER:
+		var pool: Array = []
+		match id:
+			"cabin":
+				for c in shore:
+					var d: float = Vector2(c).distance_to(start)
+					if d >= 18.0 and d <= 70.0:
+						pool.append(c)
+				if pool.is_empty():
+					pool = shore
+			"lighthouse":
+				# Headlands: shoreline with the most open water around.
+				var best_n: int = -1
+				for k in mini(300, shore.size()):
+					var c: Vector2i = shore[rng.randi_range(0, shore.size() - 1)]
+					var n: int = _count_around(wd, c.x, c.y, 5, Tiles.LAKE_WATER)
+					if n > best_n and _landmark_ok(wd, c, id):
+						best_n = n
+						pool = [c]
+				if pool.is_empty():
+					pool = shore
+			"springs":
+				pool = rocky if not rocky.is_empty() else any_land
+			"ruins":
+				pool = bay
+			"grove":
+				pool = forest if not forest.is_empty() else any_land
+			"falls":
+				pool = falls_a if not falls_a.is_empty() else falls_b
+				if pool.is_empty():
+					pool = bay
+			"hollow":
+				pool = cave if not cave.is_empty() else any_land
+		var pick := Vector2i(-1, -1)
+		for attempt in 200:
+			if pool.is_empty():
+				break
+			var c: Vector2i = pool[rng.randi_range(0, pool.size() - 1)]
+			if _landmark_ok(wd, c, id, 22.0 if attempt < 150 else 10.0):
+				pick = c
+				break
+		if pick.x < 0 and not pool.is_empty():
+			pick = pool[rng.randi_range(0, pool.size() - 1)]
+		if pick.x < 0:
+			pick = wd.start + Vector2i(3 + wd.landmarks.size() * 2, 0)
+		wd.landmarks.append({"id": id, "tile": pick, "name": LANDMARK_NAMES[id]})
+		_stamp_landmark(wd, id, pick)
+
+
+static func _landmark_ok(wd: WorldData, c: Vector2i, id: String, spacing: float = 22.0) -> bool:
+	var p := Vector2(c)
+	if p.distance_to(Vector2(wd.start)) < 12.0:
+		return false
+	for s in wd.stores:
+		if p.distance_to(Vector2(s as Vector2i)) < 14.0:
+			return false
+	for lm in wd.landmarks:
+		if lm["id"] != id and p.distance_to(Vector2(lm["tile"] as Vector2i)) < spacing:
+			return false
+	return true
+
+
+static func _stamp_landmark(wd: WorldData, id: String, c: Vector2i) -> void:
+	var w: int = wd.width
+	match id:
+		"cabin":
+			for dy in range(-2, 3):
+				for dx in range(-2, 3):
+					var i: int = (c.y + dy) * w + c.x + dx
+					if Tiles.DIGGABLE[wd.tiles[i]] == 1:
+						wd.tiles[i] = Tiles.GRASS
+		"springs":
+			for dy in range(-2, 3):
+				for dx in range(-2, 3):
+					var i: int = (c.y + dy) * w + c.x + dx
+					if Tiles.DIGGABLE[wd.tiles[i]] == 1:
+						wd.tiles[i] = Tiles.ROCKY
+		"ruins":
+			for dy in range(-3, 4):
+				for dx in range(-3, 4):
+					var i: int = (c.y + dy) * w + c.x + dx
+					if wd.tiles[i] == Tiles.DEEP and dx * dx + dy * dy <= 10:
+						wd.tiles[i] = Tiles.SHALLOW
+		"grove":
+			for dy in range(-2, 3):
+				for dx in range(-2, 3):
+					var i: int = (c.y + dy) * w + c.x + dx
+					if Tiles.DIGGABLE[wd.tiles[i]] == 1 and dx * dx + dy * dy <= 5:
+						wd.tiles[i] = Tiles.MEADOW
+		"falls":
+			# A strong current pushes away from the foot of the falls.
+			for dy in range(0, 4):
+				for dx in range(-1, 2):
+					var x: int = c.x + dx
+					var y: int = c.y + dy
+					if wd.in_bounds(x, y) and Tiles.is_water(wd.tiles[y * w + x]):
+						wd.flow[y * w + x] = Vector2(0, 0.9 - dy * 0.15)
 
 
 ## Biome for the fertile lowland band, from moisture and temperature.
@@ -442,6 +610,12 @@ static func _place_decor(wd: WorldData, moist: PackedFloat32Array) -> void:
 		clear.append(dk)
 	for tr in wd.treasures:
 		clear.append(tr["pos"])
+	for lm in wd.landmarks:
+		var lt: Vector2i = lm["tile"]
+		var lr: int = int(LANDMARK_CLEAR.get(lm["id"], 2))
+		for dy in range(-lr, lr + 1):
+			for dx in range(-lr, lr + 1):
+				clear.append(lt + Vector2i(dx, dy))
 	for c in clear:
 		var cp: Vector2i = c
 		if cp.x >= 0 and cp.y >= 0 and cp.x < w and cp.y < h:

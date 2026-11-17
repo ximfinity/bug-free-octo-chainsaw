@@ -118,6 +118,26 @@ func test_world(seed_value: int, size: int) -> void:
 		var tp: Vector2i = tr["pos"]
 		check(w.get_decor(tp.x, tp.y) == -1, tag + ": treasure tile clear of decor")
 	check(int(counts.get(Tiles.RIVER, 0)) > 0, tag + ": has rivers")
+	check(w.landmarks.size() == 7, tag + ": all 7 unique areas placed (%d)" % w.landmarks.size())
+	var seen_ids := {}
+	for lm in w.landmarks:
+		var lt: Vector2i = lm["tile"]
+		seen_ids[lm["id"]] = true
+		check(w.in_bounds(lt.x, lt.y), tag + ": %s in bounds" % lm["id"])
+		check(w.is_walkable(lt.x, lt.y) or w.is_kayak_water(lt.x, lt.y), tag + ": %s reachable" % lm["id"])
+		for other in w.landmarks:
+			if other["id"] != lm["id"]:
+				check(Vector2(lt).distance_to(Vector2(other["tile"] as Vector2i)) >= 6.0,
+					tag + ": %s and %s are apart" % [lm["id"], other["id"]])
+	check(seen_ids.size() == 7, tag + ": landmark ids are unique")
+	var falls: Dictionary = w.landmark("falls")
+	if not falls.is_empty():
+		var ft: Vector2i = falls["tile"]
+		check(w.is_kayak_water(ft.x, ft.y), tag + ": Thunder Falls sits on navigable water")
+	var hollow: Dictionary = w.landmark("hollow")
+	if not hollow.is_empty():
+		var ht: Vector2i = hollow["tile"]
+		check(w.is_walkable(ht.x, ht.y), tag + ": Bear's Hollow is on walkable ground")
 	print("%s size %d: %d ms, water %.0f%%, %d stores, %d treasures" % [
 		tag, size, ms, water_frac * 100.0, w.stores.size(), w.treasures.size()])
 

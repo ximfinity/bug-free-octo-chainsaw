@@ -18,6 +18,8 @@ var stores: Array = []
 var store_docks: Array = []
 ## Array of {"pos": Vector2i, "loot": String}
 var treasures: Array = []
+## Unique places: Array of {"id": String, "tile": Vector2i, "name": String}
+var landmarks: Array = []
 var start: Vector2i = Vector2i.ZERO
 var start_water: Vector2i = Vector2i.ZERO
 
@@ -77,6 +79,13 @@ func get_decor(x: int, y: int) -> int:
 	if x < 0 or y < 0 or x >= width or y >= height or decor.is_empty():
 		return -1
 	return decor[y * width + x] - 1
+
+
+func landmark(id: String) -> Dictionary:
+	for lm in landmarks:
+		if lm["id"] == id:
+			return lm
+	return {}
 
 
 func pixel_size() -> Vector2:

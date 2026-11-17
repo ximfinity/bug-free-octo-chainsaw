@@ -296,6 +296,51 @@ func _run() -> void:
 	await shot("17_journal")
 	main.close_screen()
 
+	# 18+. Unique areas.
+	for n in main.entities.get_children():
+		if n.is_in_group("animals"):
+			n.queue_free()
+	main.day_night.set_time(10.5, false)
+	for lid in ["cabin", "lighthouse", "springs", "grove", "hollow"]:
+		var lmn = main.landmarks[lid]
+		_unseat_all()
+		p.position = lmn.position + Vector2(-40, 46)
+		p.facing = Vector2.RIGHT
+		var o2 = main.partner_of(p)
+		o2.position = p.position + Vector2(-30, 8)
+		o2.anchor = o2.position
+		main.camera.position = p.position
+		main.camera.reset_smoothing()
+		main._cam_lead = Vector2.ZERO
+		await frames(25)
+		await shot("18_place_" + lid)
+	for lid in ["ruins", "falls"]:
+		var lw = main.landmarks[lid]
+		var wt: Vector2i = lw.tile + (Vector2i(1, 1) if lid == "ruins" else Vector2i(0, 2))
+		if w.is_kayak_water(wt.x, wt.y):
+			paddle_at(wt, -PI * 0.5, true)
+			main._cam_lead = Vector2.ZERO
+			await frames(25)
+			await shot("18_place_" + lid)
+	_unseat_all()
+	walk_to(w.landmark("cabin")["tile"] + Vector2i(1, 1), Vector2.RIGHT)
+	main.day_night.set_time(21.5, false)
+	await frames(20)
+	await shot("19_cabin_night")
+	main.day_night.set_time(10.0, true)
+	main.talk_to("paddler")
+	await frames(8)
+	await shot("20_dialogue")
+	main.close_screen()
+	main.open_screen(main.journal_screen)
+	main.journal_screen._set_tab(0)
+	await frames(8)
+	await shot("21_journal_trail")
+	main.journal_screen._set_tab(2)
+	await frames(8)
+	await shot("22_journal_places")
+	main.close_screen()
+
 	# 11. Map screen and store screen.
 	main.open_screen(main.map_screen)
 	await frames(10)

@@ -99,6 +99,7 @@ func _sell(id: String, n: int) -> void:
 	var earned: int = int(ItemDB.item(id).get("price", 0)) * n
 	p.coins += earned
 	main.message("Sold %d %s for %d coins." % [n, ItemDB.item_name(id), earned])
+	Sfx.play("coin")
 	refresh()
 
 
@@ -129,6 +130,7 @@ func _buy(id: String, qty: int, cost: int) -> void:
 	p.coins -= cost
 	p.inventory.add(id, qty)
 	main.message("Bought %s." % ItemDB.item_name(id))
+	Sfx.play("coin")
 	refresh()
 
 
@@ -149,6 +151,8 @@ func _build_upgrades(p) -> void:
 	upgrade_list.add_child(UI.label("Paddle (acceleration and stamina)", 11, Color(1.0, 0.85, 0.45)))
 	for i in ItemDB.PADDLES.size():
 		var pd: Dictionary = ItemDB.PADDLES[i]
+		if bool(pd.get("quest", false)) and i > p.paddle_level:
+			continue
 		var row := _row(-1, "%s - %s" % [pd["name"], pd["desc"]])
 		if i <= p.paddle_level:
 			row.add_child(UI.label("owned" if i == p.paddle_level else "-", 9, Color(0.6, 0.9, 0.6)))

@@ -66,7 +66,8 @@ func _process(delta: float) -> void:
 			if ItemDB.rarity(item_id) >= 1:
 				main.on_rare_item(who, item_id)
 			elif who.controlled:
-				main.message("+%d %s" % [added, ItemDB.item_name(item_id)])
+				main.item_toast(item_id, added)
+			Sfx.play("pickup", position, -6.0)
 			amount -= added
 		if amount <= 0:
 			queue_free()

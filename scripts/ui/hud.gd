@@ -17,6 +17,7 @@ var messages: VBoxContainer
 var minimap: Control
 var action_bar
 var party_panel: Control
+var tracker: Control
 
 
 func _ready() -> void:
@@ -67,6 +68,12 @@ func _ready() -> void:
 	action_bar = ActionBar.new()
 	add_child(action_bar)
 
+	tracker = Control.new()
+	UI.place(tracker, 1.0, 0.0, 1.0, 0.0, -330, 236, -14, 380)
+	tracker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tracker.draw.connect(_draw_tracker)
+	add_child(tracker)
+
 	party_panel = Control.new()
 	party_panel.position = Vector2(14, 150)
 	party_panel.size = Vector2(260, 60)
@@ -101,6 +108,8 @@ func _process(_delta: float) -> void:
 	bars.queue_redraw()
 	minimap.queue_redraw()
 	party_panel.queue_redraw()
+	tracker.queue_redraw()
+	queue_redraw()
 
 
 func _draw_bars() -> void:
@@ -128,6 +137,46 @@ func _bar(y: float, title: String, value: float, color: Color, pending: float = 
 	bars.draw_rect(Rect2(x0 + 2, y + 2, (w - 4) * clampf(value / 100.0, 0.0, 1.0), 5), color.lightened(0.3))
 	bars.draw_string_outline(font, Vector2(10, y + 17), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, 5, Color(0.1, 0.08, 0.13))
 	bars.draw_string(font, Vector2(10, y + 17), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color.WHITE)
+
+
+## Current trail step and its goals, under the minimap.
+func _draw_tracker() -> void:
+	if main == null or main.quests == null:
+		return
+	var font: Font = get_theme_default_font()
+	var tr: Array = main.quests.tracker()
+	var lines: Array = tr[1]
+	var h: float = 30.0 + lines.size() * 20.0
+	var w: float = tracker.size.x
+	tracker.draw_rect(Rect2(0, 0, w, h), Color(0.13, 0.11, 0.17, 0.7))
+	tracker.draw_rect(Rect2(0, 0, 4, h), Color(1.0, 0.81, 0.25))
+	tracker.draw_string(font, Vector2(12, 20), str(tr[0]), HORIZONTAL_ALIGNMENT_LEFT, w - 16, 16, Color(1.0, 0.85, 0.45))
+	for i in lines.size():
+		var done: bool = str(lines[i]).begins_with("[x]")
+		tracker.draw_string(font, Vector2(12, 42 + i * 20), str(lines[i]), HORIZONTAL_ALIGNMENT_LEFT, w - 16, 13,
+			Color(0.55, 0.85, 0.55) if done else Color(0.92, 0.92, 0.88))
+
+
+## Arrow at the screen edge pointing to an off-screen partner.
+func _draw() -> void:
+	if main == null or main.player == null or main.party.size() < 2:
+		return
+	var other = main.partner_of(main.player)
+	if other == null:
+		return
+	var rel: Vector2 = other.position - main.camera.get_screen_center_position()
+	var half: Vector2 = size * 0.5
+	if absf(rel.x) < half.x - 20 and absf(rel.y) < half.y - 20:
+		return
+	var dir: Vector2 = rel.normalized()
+	var k: float = minf((half.x - 40) / maxf(absf(dir.x), 0.001), (half.y - 110) / maxf(absf(dir.y), 0.001))
+	var p: Vector2 = half + dir * k
+	var col: Color = Color(1.0, 0.45, 0.4) if other.downed else Color(0.45, 0.9, 0.45)
+	var side: Vector2 = dir.orthogonal()
+	draw_colored_polygon(PackedVector2Array([p + dir * 14, p - dir * 8 + side * 10, p - dir * 8 - side * 10]), col)
+	var font: Font = get_theme_default_font()
+	draw_string_outline(font, p - dir * 26 + Vector2(-30, 5), other.char_name, HORIZONTAL_ALIGNMENT_CENTER, 60, 13, 4, Color(0.1, 0.08, 0.13))
+	draw_string(font, p - dir * 26 + Vector2(-30, 5), other.char_name, HORIZONTAL_ALIGNMENT_CENTER, 60, 13, col)
 
 
 ## Small card for each character: name, health, and what they're doing.

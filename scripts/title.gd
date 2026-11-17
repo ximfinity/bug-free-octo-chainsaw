@@ -7,6 +7,7 @@ const Art = preload("res://scripts/art.gd")
 var seed_edit: LineEdit
 var size_option: OptionButton
 var continue_btn: Button
+var name_edits: Array = []
 var _t: float = 0.0
 var kayak_sprite: TextureRect
 
@@ -56,6 +57,16 @@ func _ready() -> void:
 		size_option.add_item(k)
 	size_option.select(1)
 	row.add_child(size_option)
+	var names_row := HBoxContainer.new()
+	inner.add_child(names_row)
+	names_row.add_child(UI.label("Paddlers", 10))
+	for i in 2:
+		var le := LineEdit.new()
+		le.text = str(GameState.char_names[i])
+		le.max_length = 14
+		le.custom_minimum_size = Vector2(170, 0)
+		names_row.add_child(le)
+		name_edits.append(le)
 	inner.add_child(UI.button("New Game", _on_new_game, 200))
 	continue_btn = UI.button("Continue", func(): GameState.continue_game(), 200)
 	continue_btn.disabled = not GameState.has_save()
@@ -69,6 +80,9 @@ func _ready() -> void:
 
 
 func _on_new_game() -> void:
+	for i in name_edits.size():
+		var nm: String = (name_edits[i] as LineEdit).text.strip_edges()
+		GameState.char_names[i] = nm if nm != "" else ["Juniper", "Rowan"][i]
 	var txt: String = seed_edit.text.strip_edges()
 	var seed_value: int
 	if txt == "":

@@ -40,6 +40,14 @@ func _draw() -> void:
 	var other = main.partner_of(main.player)
 	if other != null and not (other.is_paddling() and main.player.is_paddling()):
 		_marker(other.position / TILE, origin, Color(1.0, 0.45, 0.4) if other.downed else Color(0.45, 0.9, 0.45), 4.5)
+	for lm in w.landmarks:
+		var lt: Vector2 = Vector2(lm["tile"]) + Vector2(0.5, 0.5)
+		if bool(main.places.get("found", {}).get(lm["id"], false)):
+			_marker(lt, origin, Color(0.37, 0.9, 0.85), 4.0)
+		if main.quest_mark == lm["id"]:
+			var qp: Vector2 = ((lt - origin) * ZOOM).clamp(Vector2(8, 8), size - Vector2(8, 8))
+			var pulse: float = 6.0 + 2.5 * sin(Time.get_ticks_msec() / 200.0)
+			draw_arc(qp, pulse, 0.0, TAU, 20, Color(1.0, 0.81, 0.25), 3.0)
 	_marker(pt, origin, Color.WHITE, 5.0)
 	draw_rect(Rect2(Vector2.ZERO, size), Color(1.0, 0.8, 0.45), false, 3.0)
 

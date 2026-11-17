@@ -19,6 +19,8 @@ var speed_mult: float = 0.6
 var _stuck: float = 0.0
 var _last_pos: Vector2 = Vector2.ZERO
 var _alarm_cd: float = 0.0
+var _fish_t: float = 60.0
+var _greeted: bool = true
 
 
 ## Ask the partner to come to `pos` (they then stay there).
@@ -32,7 +34,16 @@ func come_to(c, pos: Vector2) -> void:
 func tick(c, delta: float) -> void:
 	c.ai_input = Vector2.ZERO
 	_alarm_cd -= delta
-	if c.downed or c.is_paddling() or c.is_carrying():
+	if c.downed or c.is_carrying():
+		return
+	if c.is_paddling():
+		# Waiting in a parked kayak with a rod: catch the odd fish.
+		if c.inventory.has("fishing_rod") and c.kayak.driver() == null:
+			_fish_t -= delta
+			if _fish_t <= 0.0:
+				_fish_t = randf_range(50.0, 90.0)
+				if c.inventory.add("fish_raw", 1) > 0:
+					c.main.partner_message(c, "%s caught a fish." % c.char_name)
 		return
 	var main = c.main
 	# Danger first.
@@ -62,6 +73,13 @@ func tick(c, delta: float) -> void:
 		if c.position.distance_to(fire) > 100.0 and c.position.distance_to(fire) < 32.0 * 30:
 			if state != "follow":
 				come_to(c, fire + Vector2(randf_range(-40, 40), 50))
+	# A wave hello when you come back.
+	var d_you: float = c.position.distance_to(main.player.position)
+	if d_you > 400.0:
+		_greeted = false
+	elif d_you < 96.0 and not _greeted:
+		_greeted = true
+		main.emote(c, "wave")
 	if c.tool_action != "":
 		return
 	timer -= delta

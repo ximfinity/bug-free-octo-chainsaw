@@ -50,6 +50,7 @@ const PAD_BUTTONS := {
 var new_game_seed: int = 0
 var new_game_size: int = 448
 var pending_load: Dictionary = {}
+var char_names: Array = ["Juniper", "Rowan"]
 var fullscreen: bool = false
 var ui_theme: Theme
 
@@ -225,4 +226,6 @@ func continue_game() -> void:
 
 func quit_to_title() -> void:
 	get_tree().paused = false
+	Engine.time_scale = 1.0
+	Sfx.stop_ambience()
 	get_tree().change_scene_to_file("res://scenes/title.tscn")

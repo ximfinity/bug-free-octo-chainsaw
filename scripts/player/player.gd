@@ -84,6 +84,7 @@ var _anim: float = 0.0
 var _stroke_t: float = 0.0
 var _last_tile: Vector2i = Vector2i(-9999, -9999)
 var _swing_count: int = 0
+var _last_step_col: int = 0
 
 var sprite: Sprite2D
 var carry_sprite: Sprite2D
@@ -167,6 +168,15 @@ func setup(main_node, world_data, kayak_node, who_index: int = 0) -> void:
 		name_label.text = char_name
 	anchor = position
 	apply_upgrades()
+
+
+func set_char_name(n: String) -> void:
+	n = n.strip_edges()
+	if n == "":
+		n = NAMES[who]
+	char_name = n.substr(0, 14)
+	if name_label:
+		name_label.text = char_name
 
 
 func apply_upgrades() -> void:
@@ -449,6 +459,10 @@ func _enter_kayak(spot: Vector2) -> void:
 	carry_sprite.visible = false
 	_cancel_tool()
 	anchor = spot
+	main.quest_event("board")
+	if kayak.riders.size() >= 2:
+		main.quest_event("board_both")
+	Sfx.play("splash", spot)
 
 
 ## Leaves the kayak onto `land`; any other rider stays aboard.
@@ -540,6 +554,7 @@ func try_attack(use_mouse: bool, toward: Vector2 = Vector2.INF) -> bool:
 	var tw := arc.create_tween()
 	tw.tween_property(arc, "modulate:a", 0.0, 0.18)
 	tw.tween_callback(arc.queue_free)
+	Sfx.play("swing", position, -4.0)
 	var hit := false
 	for a in get_tree().get_nodes_in_group("animals"):
 		if not a.alive:
@@ -548,6 +563,8 @@ func try_attack(use_mouse: bool, toward: Vector2 = Vector2.INF) -> bool:
 		if to_a.length() < 44.0 and (to_a.length() < 14.0 or to_a.normalized().dot(dir) > 0.25):
 			a.hit(int(w["damage"]), dir, float(w["knockback"]), self)
 			hit = true
+	if hit and controlled:
+		main.hit_stop()
 	return hit
 
 
@@ -567,6 +584,7 @@ func try_shoot(use_mouse: bool) -> void:
 			dir = to_mouse.normalized()
 	inventory.remove("arrows", 1)
 	_shoot_cd = SHOOT_COOLDOWN
+	Sfx.play("bow", position)
 	var a = ArrowScript.new()
 	a.main = main
 	a.direction = dir
@@ -610,6 +628,7 @@ func _process_fishing(delta: float) -> void:
 		fish_state = 2
 		fish_timer = 0.9
 		bite_icon.visible = true
+		Sfx.play("bite", position)
 	elif fish_state == 2:
 		bite_icon.visible = int(_anim * 10.0) % 2 == 0
 		if fish_timer <= 0.0:
@@ -634,8 +653,10 @@ func _catch_fish() -> void:
 			else:
 				gain(rid, 1, position)
 				main.on_rare_item(self, rid)
+			main.quest_event("catch_fish")
 			return
 	var n: int = 2 if randf() < 0.2 else 1
+	main.quest_event("catch_fish")
 	var added: int = inventory.add("fish_raw", n)
 	if added > 0:
 		main.message("Caught %d fish!" % added)
@@ -757,6 +778,7 @@ func _advance_tool(delta: float) -> void:
 		if swings > _swing_count:
 			_swing_count = swings
 			main.chop_swing_fx(tool_tile)
+			Sfx.play("chop", world.tile_center(tool_tile))
 	if tool_progress >= total:
 		var act: String = tool_action
 		var t: Vector2i = tool_tile
@@ -791,6 +813,8 @@ func _perform(act: String, t: Vector2i) -> void:
 				return
 			main.tree_fall_fx(t, tree)
 			edits.set_edit(t, "stump", now, tree)
+			main.quest_event("chop")
+			Sfx.play("treefall", at)
 			var wood: int = randi_range(3, 4)
 			gain("wood", wood, at)
 			var msg := "+%d Firewood" % wood
@@ -820,11 +844,13 @@ func _perform(act: String, t: Vector2i) -> void:
 				edits.clear_edit(t, -1)
 				_say("+%d Wild Mushroom" % m)
 		"till":
+			Sfx.play("dig", at)
 			edits.set_edit(t, "plot", now)
 			FX.splash(main.entities, at, 4)
 			if controlled and first_seed() == "":
 				main.message("Plot ready. Buy seeds at 100's of Kayaks, or find them foraging.")
 		"dig":
+			Sfx.play("dig", at)
 			edits.set_edit(t, "dug", now)
 			var r: float = randf()
 			if r < 0.12:
@@ -842,6 +868,7 @@ func _perform(act: String, t: Vector2i) -> void:
 			inventory.remove(seed_id2, 1)
 			var crop: String = ItemDB.ITEMS[seed_id2]["seed"]
 			edits.set_edit(t, "crop", now, crop, 0)
+			main.quest_event("plant")
 			_say("Planted %s." % crop)
 		"harvest":
 			var e: Array = edits.get_edit(world.idx(t.x, t.y))
@@ -852,6 +879,7 @@ func _perform(act: String, t: Vector2i) -> void:
 			var n2: int = randi_range(2, 3)
 			gain(yid, n2, at)
 			edits.set_edit(t, "plot", now)
+			main.quest_event("harvest")
 			_say("Harvested %d %s!" % [n2, ItemDB.item_name(yid)])
 		"revive":
 			var other = partner()
@@ -892,7 +920,10 @@ func _forest_nearby() -> bool:
 # ---------------------------------------------------------------- survival
 func _update_survival(delta: float) -> void:
 	var sprint: bool = controlled and Input.is_action_pressed("sprint")
-	var rate: float = HUNGER_RATE
+	var rate: float = HUNGER_RATE * (1.0 if controlled else 0.5)
+	# Waiting partners can't starve or freeze to death; only animals can
+	# knock them out.
+	var floor_hp: float = 0.0 if controlled else 15.0
 	if mode == Mode.PADDLING and velocity.length() > 20.0:
 		rate *= 1.15
 	if sprint:
@@ -912,15 +943,16 @@ func _update_survival(delta: float) -> void:
 		poison -= delta
 		health -= 1.0 * delta
 	if hunger <= 0.0:
-		health -= 1.0 * delta
+		if health > floor_hp:
+			health = maxf(floor_hp, health - 1.0 * delta)
 	elif hunger > 50.0 and health < 100.0 and poison <= 0.0:
 		health = minf(100.0, health + 0.5 * delta)
 	# Cold nights: you need a lit camp (or the store's porch).
 	if main.day_night.is_night() and not main.is_in_safe_zone(position):
 		exposure += delta
 		cold = exposure > EXPOSURE_GRACE
-		if cold:
-			health -= 0.3 * delta
+		if cold and health > floor_hp:
+			health = maxf(floor_hp, health - 0.3 * delta)
 	else:
 		exposure = 0.0
 		cold = false
@@ -956,6 +988,8 @@ func take_damage(amount: float, poisoned: float = 0.0) -> void:
 	if poisoned > 0.0:
 		poison = maxf(poison, poisoned)
 	_invuln = 0.6
+	main.damage_number(position + Vector2(0, -50), int(amount), Color(1.0, 0.4, 0.35))
+	Sfx.play("hurt", position)
 	sprite.modulate = Color(1, 0.3, 0.3)
 	var tw := create_tween()
 	tw.tween_property(sprite, "modulate", Color.WHITE, 0.3)
@@ -1021,6 +1055,7 @@ func _update_visuals(delta: float) -> void:
 					var dip: bool = paddling and (frame == 1 or frame == 3)
 					kayak.stroke_frame = frame
 					if dip:
+						Sfx.play("splash%d" % (randi() % 3), position, -8.0)
 						var side: float = 1.0 if frame == 1 else -1.0
 						var blade: Vector2 = position + Vector2.from_angle(heading + PI * 0.5 * side) * 17.0
 						FX.splash(get_parent(), blade, 4)
@@ -1044,6 +1079,7 @@ func _update_visuals(delta: float) -> void:
 				carry_sprite.texture = Art.kayak_frame(hull_level, 0 if east else 8, 0)
 			elif moving:
 				col = int(_anim * (9.0 if velocity.length() > WALK_SPEED * 1.2 else 7.0)) % 4
+				_footstep(col)
 			elif tool_action != "":
 				col = 1 + int(_anim * 6.0) % 2
 			sprite.texture = Art.player_frame(view, col, who)
@@ -1053,6 +1089,22 @@ func _update_visuals(delta: float) -> void:
 		sprite.modulate = Color(0.75, 1.0, 0.7)
 	elif cold:
 		sprite.modulate = Color(0.8, 0.88, 1.1)
+
+
+## Dust on land, rings in the shallows, a soft step sound for the player.
+func _footstep(col: int) -> void:
+	if col == _last_step_col or (col != 1 and col != 3):
+		_last_step_col = col
+		return
+	_last_step_col = col
+	if world.tile_type_at_pos(position) == Tiles.SHALLOW:
+		FX.ripple(get_parent(), position, 12.0, 0.6)
+		if controlled:
+			Sfx.play("splash%d" % (randi() % 3), position, -14.0)
+	else:
+		main.dust(position)
+		if controlled:
+			Sfx.play("step%d" % (randi() % 2), position, -10.0)
 
 
 # -------------------------------------------------------------- save/load

@@ -26,7 +26,7 @@ const HINTS := {
 const FIND_ORDER := ["rabbit_foot", "antler", "wolf_fang", "wildcat_claw", "bear_claw", "amber",
 	"bird_egg", "golden_mushroom", "arrowhead", "old_coin", "fox_pelt", "loon_feather", "owl_feather",
 	"moose_antler", "white_antler", "golden_trout", "elder_claw", "spirit_pearl", "coin_purse",
-	"compass", "gem", "gold_idol", "shiny_tuft", "silver_pelt", "golden_pelt", "old_boot"]
+	"compass", "gem", "gold_idol", "stone_tablet", "bronze_mask", "jade_ring", "shiny_tuft", "silver_pelt", "golden_pelt", "old_boot"]
 
 var main
 var content: VBoxContainer
@@ -35,12 +35,27 @@ var finds_grid: GridContainer
 var summary: Label
 var progress: Control
 var _completion: float = 0.0
+var pages: Array = []
+var tab_buttons: Array = []
+var places_box: VBoxContainer
+var trail_box: VBoxContainer
+var tab: int = 0
+const QuestDB = preload("res://scripts/data/quest_db.gd")
+const PLACE_HINTS := {
+	"cabin": "A lakeshore clearing not far from where you started.",
+	"lighthouse": "A headland with open water on every side.",
+	"springs": "High rocky ground. Look for steam.",
+	"ruins": "A shallow bay with stone in the water.",
+	"grove": "Deep forest where the trees grow giant.",
+	"falls": "Where water meets a mountain wall.",
+	"hollow": "A cave at the foot of the mountains.",
+}
 
 
 func _ready() -> void:
 	UI.place(self, 0, 0, 1, 1, 0, 0, 0, 0)
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	var m: Array = UI.modal("Creature Journal", GameState.ui_theme)
+	var m: Array = UI.modal("Journal", GameState.ui_theme)
 	add_child(m[0])
 	content = m[1]
 	summary = UI.label("", 9, Color(1.0, 0.9, 0.6))
@@ -49,8 +64,29 @@ func _ready() -> void:
 	progress.custom_minimum_size = Vector2(0, 16)
 	progress.draw.connect(_draw_progress)
 	content.add_child(progress)
+	var tabs := HBoxContainer.new()
+	content.add_child(tabs)
+	var names: Array = ["Trail", "Creatures", "Places"]
+	for i in names.size():
+		var idx: int = i
+		var b := UI.button(names[i], func(): _set_tab(idx), 90)
+		tabs.add_child(b)
+		tab_buttons.append(b)
+	var trail_scroll := ScrollContainer.new()
+	trail_scroll.custom_minimum_size = Vector2(920, 420)
+	content.add_child(trail_scroll)
+	trail_box = VBoxContainer.new()
+	trail_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	trail_scroll.add_child(trail_box)
 	var hb := HBoxContainer.new()
 	content.add_child(hb)
+	var places_scroll := ScrollContainer.new()
+	places_scroll.custom_minimum_size = Vector2(920, 420)
+	content.add_child(places_scroll)
+	places_box = VBoxContainer.new()
+	places_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	places_scroll.add_child(places_box)
+	pages = [trail_scroll, hb, places_scroll]
 	var left := ScrollContainer.new()
 	left.custom_minimum_size = Vector2(600, 420)
 	hb.add_child(left)
@@ -72,6 +108,52 @@ func _ready() -> void:
 func open() -> void:
 	visible = true
 	refresh()
+	_set_tab(tab)
+
+
+func _set_tab(i: int) -> void:
+	tab = i
+	for k in pages.size():
+		pages[k].visible = k == i
+		tab_buttons[k].modulate = Color(1, 1, 1) if k == i else Color(0.65, 0.65, 0.7)
+
+
+func _refresh_trail() -> void:
+	UI.clear_children(trail_box)
+	var q = main.quests
+	trail_box.add_child(UI.label("The Old Paddler's Trail", 12, Color(1.0, 0.85, 0.45)))
+	for i in QuestDB.STEPS.size():
+		var st: Dictionary = QuestDB.STEPS[i]
+		if i < q.step:
+			trail_box.add_child(UI.label("[done]  %d. %s" % [i + 1, st["title"]], 9, Color(0.55, 0.85, 0.55)))
+		elif i == q.step:
+			trail_box.add_child(UI.label("%d. %s" % [i + 1, st["title"]], 11, Color(1.0, 0.95, 0.75)))
+			var t := UI.label(str(st["text"]), 9, Color(0.9, 0.9, 0.85))
+			t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			t.custom_minimum_size = Vector2(880, 0)
+			trail_box.add_child(t)
+			for line in q.tracker()[1]:
+				trail_box.add_child(UI.label("      " + str(line), 9, Color(0.75, 0.9, 1.0)))
+		else:
+			trail_box.add_child(UI.label("%d. ???" % (i + 1), 9, Color(0.5, 0.5, 0.55)))
+	if q.is_complete():
+		trail_box.add_child(UI.label("Trail complete. The Founder's Paddle is yours.", 11, Color(1.0, 0.81, 0.25)))
+
+
+func _refresh_places() -> int:
+	UI.clear_children(places_box)
+	var found: Dictionary = main.places.get("found", {})
+	var n: int = 0
+	for lm in main.world.landmarks:
+		var id: String = lm["id"]
+		var got: bool = bool(found.get(id, false))
+		if got:
+			n += 1
+		places_box.add_child(UI.label(str(lm["name"]) if got else "???", 11,
+			Color(0.37, 0.9, 0.85) if got else Color(0.6, 0.6, 0.65)))
+		places_box.add_child(UI.label("      " + ("Discovered." if got else str(PLACE_HINTS.get(id, ""))), 9,
+			Color(0.75, 0.78, 0.82)))
+	return n
 
 
 func refresh() -> void:
@@ -114,9 +196,13 @@ func refresh() -> void:
 			found += 1
 		finds_grid.add_child(_find_cell(id, n2))
 	var bottle: int = int(finds.get("bottle", 0))
-	_completion = float(vseen + found) / float(maxi(1, vtotal + FIND_ORDER.size()))
-	summary.text = "Journal %d%% complete      Creatures %d / %d      Colour variants %d / %d      Rare finds %d / %d%s" % [
+	_refresh_trail()
+	var places_found: int = _refresh_places()
+	var places_total: int = main.world.landmarks.size()
+	_completion = float(vseen + found + places_found) / float(maxi(1, vtotal + FIND_ORDER.size() + places_total))
+	summary.text = "Journal %d%% complete    Creatures %d/%d    Variants %d/%d    Rare finds %d/%d    Places %d/%d%s" % [
 		int(round(_completion * 100.0)), seen, total, vseen, vtotal, found, FIND_ORDER.size(),
+		places_found, places_total,
 		"      Bottles %d" % bottle if bottle > 0 else ""]
 	progress.queue_redraw()
 

@@ -60,6 +60,13 @@ const ITEMS := {
 	"arrowhead": {"name": "Ancient Arrowhead", "icon": 50, "stack": 10, "price": 40, "rarity": 1},
 	"old_coin": {"name": "Old Silver Coin", "icon": 51, "stack": 10, "price": 75, "rarity": 2},
 	"old_boot": {"name": "Soggy Old Boot", "icon": 52, "stack": 5, "price": 1, "rarity": 0},
+	"bronze_mask": {"name": "Bronze Mask", "icon": 57, "stack": 1, "price": 260, "rarity": 3},
+	"stone_tablet": {"name": "Carved Stone Tablet", "icon": 58, "stack": 1, "price": 220, "rarity": 3},
+	"jade_ring": {"name": "Jade Ring", "icon": 59, "stack": 1, "price": 320, "rarity": 3},
+	"token_light": {"name": "Lighthouse Token", "icon": 60, "stack": 1, "price": 0, "key": true, "rarity": 2},
+	"token_ruin": {"name": "Ruins Token", "icon": 61, "stack": 1, "price": 0, "key": true, "rarity": 2},
+	"token_falls": {"name": "Falls Token", "icon": 62, "stack": 1, "price": 0, "key": true, "rarity": 2},
+	"old_pack": {"name": "The Old Paddler's Pack", "icon": 63, "stack": 1, "price": 0, "key": true, "rarity": 2},
 	"shiny_tuft": {"name": "Shiny Tuft", "icon": 54, "stack": 10, "price": 80, "rarity": 2},
 	"silver_pelt": {"name": "Silver Pelt", "icon": 55, "stack": 5, "price": 220, "rarity": 3},
 	"golden_pelt": {"name": "Golden Pelt", "icon": 56, "stack": 5, "price": 550, "rarity": 4},
@@ -93,7 +100,7 @@ const RARITY_COLORS := [Color(0.95, 0.93, 0.86), Color(0.48, 0.89, 0.42), Color(
 const RARE_DROPS := {
 	"rabbit": [["rabbit_foot", 0.03]],
 	"deer": [["antler", 0.18]],
-	"wolf": [["wolf_fang", 0.25]],
+	"wolf": [["wolf_fang", 0.18]],
 	"spider": [["amber", 0.06]],
 	"wildcat": [["wildcat_claw", 0.2]],
 	"bear": [["bear_claw", 0.35]],
@@ -149,7 +156,7 @@ const KAYAK_RETRIEVE_COST := 20
 const HULLS := [
 	{"name": "Rec Kayak", "cost": 0, "speed": 150.0, "slots": 10, "turn_rate": 3.4, "glide": 0.9,
 		"side_drag": 5.0, "desc": "Stable, forgiving and quick to turn. Room for 10 stacks."},
-	{"name": "Touring Kayak", "cost": 250, "speed": 196.0, "slots": 16, "turn_rate": 2.8, "glide": 0.6,
+	{"name": "Touring Kayak", "cost": 200, "speed": 196.0, "slots": 16, "turn_rate": 2.8, "glide": 0.6,
 		"side_drag": 6.0, "desc": "Longer hull that glides and tracks straight. 16 stacks."},
 	{"name": "Expedition Kayak", "cost": 700, "speed": 245.0, "slots": 24, "turn_rate": 2.4, "glide": 0.42,
 		"side_drag": 7.0, "desc": "Built for long trips: fastest and glides furthest. 24 stacks."},
@@ -162,7 +169,10 @@ const PADDLES := [
 		"desc": "Lighter: quicker acceleration, power strokes cost less stamina."},
 	{"name": "Carbon Paddle", "cost": 500, "accel": 470.0, "stamina": 0.55,
 		"desc": "Feather-light. Punch upstream with ease."},
+	{"name": "Founder's Paddle", "cost": 0, "accel": 620.0, "stamina": 0.35, "quest": true,
+		"desc": "The Old Paddler's own. Earned, not bought."},
 ]
+const FOUNDERS_PADDLE := 3
 
 
 static func item(id: String) -> Dictionary:

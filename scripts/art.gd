@@ -10,6 +10,24 @@ const DECOR := preload("res://assets/decor.png")
 const STORE := preload("res://assets/store.png")
 const TERRAIN := preload("res://assets/terrain.png")
 const WATER_NOISE := preload("res://assets/water_noise.png")
+const LANDMARKS := preload("res://assets/landmarks.png")
+
+# landmarks.png (128x128 cells, foot at 64,112)
+const LM_LIGHTHOUSE := 0
+const LM_CABIN := 1
+const LM_ANCIENT_TREE := 2
+const LM_PILLAR := 3
+const LM_PILLAR_BROKEN := 4
+const LM_ARCH := 5
+const LM_SPRING := 6
+const LM_CAVE := 7
+const LM_FALLS := 8  # 4 frames
+const LM_CHEST := 12
+const LM_CHEST_OPEN := 13
+const LM_NPC_PADDLER := 14
+const LM_NPC_KEEPER := 15
+const LM_BONES := 16
+const LM_PACK := 17
 
 # props.png (64x64 cells)
 const TENT := 0
@@ -93,6 +111,18 @@ static func player_frame(view: int, col: int, who: int = 0) -> AtlasTexture:
 static func creature_frame(kind: String, frame: int) -> AtlasTexture:
 	var row: int = int(CREATURE_ROWS.get(kind, 0))
 	return _region(CREATURES, "c%d_%d" % [row, frame], Rect2(frame * 48, row * 48, 48, 48))
+
+
+static func landmark(index: int) -> AtlasTexture:
+	return _region(LANDMARKS, "lm%d" % index, Rect2((index % 8) * 128, (index / 8) * 128, 128, 128))
+
+
+## A Sprite2D for a landmark cell with its foot at the node origin.
+static func landmark_sprite(index: int) -> Sprite2D:
+	var s := Sprite2D.new()
+	s.texture = landmark(index)
+	s.offset = Vector2(0, -48)
+	return s
 
 
 static func light_texture() -> Texture2D:

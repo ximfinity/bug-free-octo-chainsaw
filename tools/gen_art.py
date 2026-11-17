@@ -1126,6 +1126,12 @@ def make_props():
 
 
 # ------------------------------------------------------------------- items
+def lm_pack_icon(cv):
+    cv.ellipse(16, 18, 10, 9, rgb("#5a6b4a"))
+    cv.rect(8, 13, 24, 17, rgb("#8a5428"))
+    cv.rect(13.5, 13, 18.5, 21, rgb("#ffd23f"))
+
+
 def make_items():
     icons = []
 
@@ -1382,6 +1388,31 @@ def make_items():
         cv.line(16, 9, 16, 3, rgb("#c2503a"), 1.6)
         cv.circle(16, 3, 2, rgb("#ffd23f"))
 
+    def mask(cv):
+        cv.ellipse(16, 16, 9, 11, rgb("#b8873a"))
+        cv.ellipse(14, 14, 6, 8, rgb("#d9a85a"))
+        for x in (12, 20):
+            cv.ellipse(x, 14, 2.2, 1.6, rgb("#2b2033"))
+        cv.rect(13, 21, 19, 22.5, rgb("#2b2033"))
+
+    def tablet(cv):
+        cv.poly([(7, 6), (25, 6), (26, 26), (6, 26)], rgb("#a8a49a"))
+        for k in range(4):
+            cv.line(10, 10 + k * 4, 22 - (k % 2) * 4, 10 + k * 4, rgb("#5a5466"), 1)
+
+    def ring(cv):
+        cv.circle(16, 18, 8, rgb("#ffd23f"))
+        cv.circle(16, 18, 5, (0, 0, 0, 0))
+        cv.circle(16, 18, 5, rgb("#2b2033"))
+        cv.circle(16, 9, 4, rgb("#3fc07a"))
+        cv.circle(15, 8, 1.3, rgb("#a8f0c0"))
+
+    def token(cv, col):
+        cv.circle(16, 16, 11, rgb("#8a5428"))
+        cv.circle(16, 16, 8.5, col)
+        cv.line(11, 21, 21, 11, rgb("#f4f1ea"), 1.6)
+        cv.ellipse(21.5, 10.5, 2.2, 3.4, rgb("#f4f1ea"), 0.8)
+
     for fn in (lambda c: meat(c, False), lambda c: meat(c, True), lambda c: fish(c, False),
                lambda c: fish(c, True), berries, trailmix, hide, wood, arrows, purse, compass, gem,
                idol, tmap, shovel, bow, tent, rod, coin,
@@ -1400,12 +1431,211 @@ def make_items():
                egg, gold_mushroom, arrowhead, old_coin, boot, bottle,
                lambda c: trophy(c, rgb("#ff7ad9"), rgb("#7af0ff")),
                lambda c: trophy(c, rgb("#c9d0dc"), rgb("#ffffff")),
-               lambda c: trophy(c, rgb("#ffcf3f"), rgb("#fff6c2"))):
+               lambda c: trophy(c, rgb("#ffcf3f"), rgb("#fff6c2")),
+               mask, tablet, ring, lambda c: token(c, rgb("#e0453a")),
+               lambda c: token(c, rgb("#3fa7f0")), lambda c: token(c, rgb("#5cc05a")),
+               lambda c: lm_pack_icon(c)):
         icon(fn)
     atlas = Image.new("RGBA", (8 * 32, ((len(icons) + 7) // 8) * 32), (0, 0, 0, 0))
     for i, c in enumerate(icons):
         atlas.paste(c, ((i % 8) * 32, (i // 8) * 32))
     atlas.save(OUT / "items.png")
+
+
+# --------------------------------------------------------------- landmarks
+# landmarks.png: 128x128 cells, 8 columns. Each sprite's "foot" is at
+# (64, 112) in its cell. Index constants live in scripts/art.gd.
+LX, LY = 64, 112
+
+
+def lm_lighthouse(cv):
+    cv.ellipse(LX, LY - 2, 26, 8, rgb("#8d8f86"))
+    cv.poly([(LX - 14, LY - 2), (LX - 9, LY - 78), (LX + 9, LY - 78), (LX + 14, LY - 2)], rgb("#f4f1ea"))
+    for k in range(3):
+        y0 = LY - 20 - k * 22
+        w0 = 13.2 - k * 1.5
+        cv.poly([(LX - w0, y0), (LX + w0, y0), (LX + w0 - 0.7, y0 - 11), (LX - w0 + 0.7, y0 - 11)], rgb("#e0453a"))
+    cv.poly([(LX + 2, LY - 2), (LX + 14, LY - 2), (LX + 9, LY - 78), (LX + 3, LY - 78)], (0, 0, 0, 0))
+    cv.poly([(LX + 3, LY - 2), (LX + 14, LY - 2), (LX + 9, LY - 78), (LX + 4, LY - 78)], rgb("#d9d2c6"))
+    cv.rect(LX - 12, LY - 82, LX + 12, LY - 78, rgb("#3b3f4a"))
+    cv.rect(LX - 8, LY - 96, LX + 8, LY - 82, rgb("#ffe58a"))
+    cv.rect(LX - 1, LY - 96, LX + 1, LY - 82, rgb("#3b3f4a"))
+    cv.poly([(LX - 11, LY - 96), (LX + 11, LY - 96), (LX, LY - 110)], rgb("#e0453a"))
+    cv.rect(LX - 4, LY - 16, LX + 4, LY - 2, rgb("#5a3a22"))
+    cv.rect(LX - 3, LY - 50, LX + 3, LY - 42, rgb("#7ad0ff"))
+
+
+def lm_cabin(cv):
+    log, log_d, log_l = rgb("#9a6a3c"), rgb("#6b4a2a"), rgb("#c08a52")
+    for k in range(7):
+        y = LY - 30 + k * 4
+        cv.rect(LX - 36, y, LX + 36, y + 4, log if k % 2 == 0 else log_d)
+        cv.rect(LX - 36, y, LX + 36, y + 1, log_l)
+    cv.poly([(LX - 44, LY - 28), (LX, LY - 62), (LX + 44, LY - 28)], rgb("#4a7a3a"))
+    cv.poly([(LX, LY - 62), (LX + 44, LY - 28), (LX + 18, LY - 28)], rgb("#5f9a48"))
+    cv.rect(LX + 18, LY - 62, LX + 25, LY - 44, rgb("#8d8f86"))
+    cv.rect(LX - 6, LY - 22, LX + 6, LY - 2, rgb("#5a3a22"))
+    cv.circle(LX + 3, LY - 12, 1, rgb("#ffd23f"))
+    for wx in (LX - 28, LX + 16):
+        cv.rect(wx, LY - 24, wx + 12, LY - 14, rgb("#ffe9a8"))
+        cv.rect(wx + 5.5, LY - 24, wx + 6.5, LY - 14, log_d)
+    cv.rect(LX - 40, LY - 2, LX + 40, LY + 2, rgb("#c08a52"))
+    # paddles leaning on the wall + a hanging lantern
+    cv.line(LX + 34, LY - 2, LX + 39, LY - 34, rgb("#8a5428"), 1.6)
+    cv.ellipse(LX + 39.5, LY - 37, 2.4, 5, rgb("#ffd23f"), 0.15)
+    cv.circle(LX - 12, LY - 26, 2.5, rgb("#ffb23a"))
+
+
+def lm_ancient_tree(cv):
+    trunk, trunk_d = rgb("#6b4a33"), rgb("#4a3222")
+    cv.poly([(LX - 12, LY), (LX - 7, LY - 50), (LX + 7, LY - 50), (LX + 12, LY)], trunk)
+    cv.poly([(LX + 2, LY), (LX + 12, LY), (LX + 7, LY - 50), (LX + 3, LY - 50)], trunk_d)
+    cv.line(LX - 12, LY, LX - 20, LY + 3, trunk, 4)
+    cv.line(LX + 12, LY, LX + 20, LY + 3, trunk_d, 4)
+    cv.ellipse(LX - 2, LY - 22, 2.5, 4, trunk_d)
+    blobs = [(0, -74, 30), (-22, -62, 22), (22, -62, 22), (-10, -92, 20), (12, -90, 20), (0, -56, 22)]
+    for bx, by, r in blobs:
+        cv.circle(LX + bx, LY + by + 3, r, rgb("#1f5a3a"))
+    for bx, by, r in blobs:
+        cv.circle(LX + bx, LY + by, r * 0.93, rgb("#2f8a52"))
+    for bx, by, r in blobs[:5]:
+        cv.circle(LX + bx - r * 0.3, LY + by - r * 0.35, r * 0.45, rgb("#5cc07a"))
+    for x, y in ((-18, -70), (14, -84), (4, -60), (-6, -96), (24, -58)):
+        cv.circle(LX + x, LY + y, 1.6, rgb("#fff6c2"))
+
+
+def lm_pillar(cv, broken, arch=False):
+    st, st_l, st_d = rgb("#a8a49a"), rgb("#d0ccc0"), rgb("#7a766e")
+    def col(x, h):
+        cv.ellipse(x, LY - 2, 11, 4, rgb("#bfeeff"))
+        cv.rect(x - 6, LY - h, x + 6, LY - 2, st)
+        cv.rect(x - 6, LY - h, x - 3, LY - 2, st_l)
+        cv.rect(x + 3, LY - h, x + 6, LY - 2, st_d)
+        for k in range(int(h // 10)):
+            cv.rect(x - 6, LY - 8 - k * 10, x + 6, LY - 7 - k * 10, st_d)
+        cv.ellipse(x - 2, LY - 6, 3, 2, rgb("#4f9e5a"))
+    if arch:
+        col(LX - 20, 44)
+        col(LX + 20, 44)
+        cv.rect(LX - 28, LY - 54, LX + 28, LY - 44, st)
+        cv.rect(LX - 28, LY - 54, LX + 28, LY - 51, st_l)
+        cv.ellipse(LX + 10, LY - 50, 6, 2.5, rgb("#4f9e5a"))
+    elif broken:
+        col(LX, 18)
+        cv.poly([(LX - 6, LY - 18), (LX - 2, LY - 24), (LX + 1, LY - 19), (LX + 6, LY - 22), (LX + 6, LY - 18)], st)
+    else:
+        col(LX, 40)
+        cv.rect(LX - 8, LY - 44, LX + 8, LY - 40, st_l)
+
+
+def lm_spring(cv):
+    cv.ellipse(LX, LY - 14, 30, 16, rgb("#8d8f86"))
+    cv.ellipse(LX, LY - 14, 26, 13, rgb("#5fd0d8"))
+    cv.ellipse(LX - 4, LY - 16, 16, 7, rgb("#a8f0f0"))
+    for a in range(9):
+        ang = a * 2 * math.pi / 9
+        cv.ellipse(LX + math.cos(ang) * 29, LY - 14 + math.sin(ang) * 15, 5, 3.5, rgb("#a3a0ad"))
+
+
+def lm_cave(cv):
+    rock, rock_l, rock_d = rgb("#7a6e80"), rgb("#a59bb0"), rgb("#4c4452")
+    cv.poly([(LX - 44, LY), (LX - 34, LY - 46), (LX - 8, LY - 66), (LX + 22, LY - 58), (LX + 44, LY - 24), (LX + 46, LY)], rock)
+    cv.poly([(LX - 44, LY), (LX - 34, LY - 46), (LX - 8, LY - 66), (LX - 12, LY)], rock_l)
+    cv.ellipse(LX, LY - 14, 18, 20, rock_d)
+    cv.rect(LX - 18, LY - 14, LX + 18, LY, rock_d)
+    cv.ellipse(LX, LY - 12, 14, 16, rgb("#1a1420"))
+    cv.rect(LX - 14, LY - 12, LX + 14, LY, rgb("#1a1420"))
+    for x in (-30, 32):
+        cv.ellipse(LX + x, LY - 2, 7, 4, rock_l)
+
+
+def lm_waterfall(cv, frame):
+    rock, rock_d = rgb("#7a6e80"), rgb("#4c4452")
+    cv.rect(LX - 30, LY - 96, LX + 30, LY - 4, rock_d)
+    cv.rect(LX - 30, LY - 96, LX - 16, LY - 4, rock)
+    cv.rect(LX + 16, LY - 96, LX + 30, LY - 4, rock)
+    cv.rect(LX - 15, LY - 98, LX + 15, LY - 2, rgb("#5ab8e0"))
+    rnd = random.Random(7)
+    for k in range(22):
+        x = LX - 13 + rnd.random() * 26
+        y = LY - 96 + ((rnd.random() * 92 + frame * 23) % 92)
+        cv.rect(x, y, x + 1.6, y + 8 + rnd.random() * 8, rgb("#d8f4ff"))
+    for k in range(7):
+        cv.circle(LX - 18 + k * 6 + (frame % 2) * 2, LY - 2 - (k + frame) % 3 * 2, 5, rgb("#f4fcff"))
+
+
+def lm_chest(cv, opened):
+    cv.rect(LX - 20, LY - 22, LX + 20, LY - 2, rgb("#8a5428"))
+    cv.rect(LX - 20, LY - 22, LX - 17, LY - 2, rgb("#ffd23f"))
+    cv.rect(LX + 17, LY - 22, LX + 20, LY - 2, rgb("#ffd23f"))
+    if opened:
+        cv.poly([(LX - 20, LY - 22), (LX + 20, LY - 22), (LX + 17, LY - 40), (LX - 17, LY - 40)], rgb("#6b3f24"))
+        cv.rect(LX - 16, LY - 26, LX + 16, LY - 20, rgb("#ffd23f"))
+        for x in (-9, 0, 8):
+            cv.circle(LX + x, LY - 26, 3, rgb("#ffe58a"))
+    else:
+        cv.rect(LX - 20, LY - 34, LX + 20, LY - 22, rgb("#a8693a"))
+        cv.rect(LX - 20, LY - 24, LX + 20, LY - 21, rgb("#ffd23f"))
+        cv.rect(LX - 3, LY - 26, LX + 3, LY - 16, rgb("#ffd23f"))
+
+
+def lm_npc(cv, keeper):
+    global PAL
+    old = PAL
+    pal = dict(P)
+    if keeper:
+        pal.update({"hat": rgb("#1f3a6b"), "hat_d": rgb("#14264a"), "hat_band": rgb("#ffd23f"),
+                    "pfd": rgb("#ffd23f"), "pfd_d": rgb("#d9a514"), "pfd_l": rgb("#ffe58a"),
+                    "shirt": rgb("#1f3a6b"), "shirt_d": rgb("#14264a"), "hair": rgb("#c9c9c9"),
+                    "shorts": rgb("#3b3f4a"), "shorts_d": rgb("#2b2f38")})
+    else:
+        pal.update({"hat": rgb("#7a5a3a"), "hat_d": rgb("#5a4028"), "hat_band": rgb("#3f9e5a"),
+                    "pfd": rgb("#8a4a2a"), "pfd_d": rgb("#6b3a20"), "pfd_l": rgb("#b06a42"),
+                    "shirt": rgb("#d9c49a"), "shirt_d": rgb("#b8a47a"), "hair": rgb("#f0f0f0"),
+                    "shorts": rgb("#5a6b4a"), "shorts_d": rgb("#44523a")})
+    PAL = pal
+    sub = Canvas(32, 48)
+    draw_person(sub, 0, 0, False)
+    PAL = old
+    if not keeper:  # white beard
+        sub.poly([(11, 16), (21, 16), (19, 23), (16, 25), (13, 23)], rgb("#f0f0f0"))
+    cv.img.paste(sub.img, ((LX - 16) * S, (LY - 46) * S), sub.img)
+
+
+def lm_bones(cv):
+    for (x, y, a) in ((-12, -6, 0.3), (8, -4, -0.4), (0, -10, 1.2)):
+        cx, cy = LX + x, LY + y
+        dx, dy = math.cos(a) * 9, math.sin(a) * 9
+        cv.line(cx - dx, cy - dy, cx + dx, cy + dy, rgb("#f4f1ea"), 2.2)
+        cv.circle(cx - dx, cy - dy, 2, rgb("#f4f1ea"))
+        cv.circle(cx + dx, cy + dy, 2, rgb("#f4f1ea"))
+
+
+def lm_pack(cv):
+    cv.ellipse(LX, LY - 10, 11, 10, rgb("#5a6b4a"))
+    cv.rect(LX - 9, LY - 14, LX + 9, LY - 10, rgb("#8a5428"))
+    cv.rect(LX - 3, LY - 14, LX + 3, LY - 6, rgb("#ffd23f"))
+    cv.line(LX + 8, LY - 18, LX + 16, LY - 30, rgb("#8a5428"), 1.6)
+
+
+LANDMARK_CELLS = [
+    lm_lighthouse, lm_cabin, lm_ancient_tree, lambda c: lm_pillar(c, False), lambda c: lm_pillar(c, True),
+    lambda c: lm_pillar(c, False, True), lm_spring, lm_cave,
+    lambda c: lm_waterfall(c, 0), lambda c: lm_waterfall(c, 1), lambda c: lm_waterfall(c, 2),
+    lambda c: lm_waterfall(c, 3), lambda c: lm_chest(c, False), lambda c: lm_chest(c, True),
+    lambda c: lm_npc(c, False), lambda c: lm_npc(c, True), lm_bones, lm_pack,
+]
+
+
+def make_landmarks():
+    cols = 8
+    rows = (len(LANDMARK_CELLS) + cols - 1) // cols
+    atlas = Image.new("RGBA", (cols * 128, rows * 128), (0, 0, 0, 0))
+    for i, fn in enumerate(LANDMARK_CELLS):
+        cv = Canvas(128, 128)
+        fn(cv)
+        atlas.paste(cv.finish(True), ((i % cols) * 128, (i // cols) * 128))
+    atlas.save(OUT / "landmarks.png")
 
 
 # ------------------------------------------------------------------- store
@@ -1466,6 +1696,7 @@ if __name__ == "__main__":
     make_props()
     make_items()
     make_store()
+    make_landmarks()
     make_icon()
     for old in ("sprites.png", "tiles.png"):
         p = OUT / old
