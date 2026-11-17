@@ -72,6 +72,9 @@ func _begin_step() -> void:
 	var mark: String = str(st.get("mark", ""))
 	if mark != "":
 		main.mark_landmark(mark)
+	# A step whose goals were all done beforehand completes straight away
+	# (e.g. the lighthouse was climbed before "The Light" came up).
+	_check()
 
 
 ## Game events feed the goals. Returns true if the step completed.
@@ -79,7 +82,6 @@ func event(kind: String, id: String = "", n: int = 1) -> bool:
 	if is_complete():
 		return false
 	var st: Dictionary = current()
-	var changed := false
 	for i in st["goals"].size():
 		var g: Dictionary = st["goals"][i]
 		if g["kind"] != kind:
@@ -89,10 +91,7 @@ func event(kind: String, id: String = "", n: int = 1) -> bool:
 			continue
 		if progress[i] < int(g["n"]):
 			progress[i] = mini(int(g["n"]), progress[i] + n)
-			changed = true
-	if changed:
-		return _check()
-	return false
+	return _check()
 
 
 ## Polls "have item" goals.
@@ -118,6 +117,8 @@ func tick(delta: float) -> void:
 
 
 func _check() -> bool:
+	if is_complete():
+		return false
 	var st: Dictionary = current()
 	var met: int = 0
 	for i in st["goals"].size():

@@ -354,6 +354,7 @@ func _run() -> void:
 	check(not get_tree().paused, "journal opens and closes")
 
 	# --- v6: review fixes, unique areas, story trail, sound ---
+	var QuestDBpre = load("res://scripts/data/quest_db.gd")
 	_unseat_all()
 	j = main.party[0]
 	var rw = main.party[1]
@@ -410,6 +411,17 @@ func _run() -> void:
 	check(bears == 1, "the Elder Bear lives at Bear's Hollow (and only one)")
 	j.position = w.tile_center(w.start)
 	await frames(3)
+	# The lighthouse was climbed above, before "The Light" step: reaching
+	# that step must complete it straight away instead of getting stuck.
+	var light_idx: int = -1
+	for i in QuestDBpre.STEPS.size():
+		if QuestDBpre.STEPS[i]["id"] == "light":
+			light_idx = i
+	main.quests.step = light_idx
+	main.quests._begin_step()
+	check(main.quests.step > light_idx, "a trail step already done beforehand completes when it begins")
+	main.quests.step = 0
+	main.quests._begin_step()
 	# Story trail: drive every step through its goals.
 	var QuestDB = load("res://scripts/data/quest_db.gd")
 	var guard: int = 0
